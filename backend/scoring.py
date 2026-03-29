@@ -8,17 +8,17 @@ from typing import Dict, List, Optional, Any
 SCORING_RULES = {
     "hole_points": {
         "PAR": 0.5,
-        "BIRDIE": 3.0,   # fill in
-        "EAGLE": 8.0,    # fill in
-        "ALBATROSS": 5.0,  # fill in
-        "BOGEY": -0.5,    # fill in
-        "DOUBLE_BOGEY": -1.0,  # fill in
-        "TRIPLE_BOGEY_OR_WORSE": -1.0,  # fill in
+        "BIRDIE": 3.0,   
+        "EAGLE": 8.0,    
+        "ALBATROSS": 5.0,  
+        "BOGEY": -0.5,    
+        "DOUBLE_BOGEY": -1.0,  
+        "TRIPLE_BOGEY_OR_WORSE": -1.0,  
     },
-    "hole_in_one_bonus": 5.0,          # fill in
-    "bogey_free_round_bonus": 3.0,     # fill in
-    "consecutive_birdies_bonus": 1.0,  # fill in
-    "consecutive_bogeys_bonus": -1.0,   # fill in
+    "hole_in_one_bonus": 5.0,          
+    "bogey_free_round_bonus": 3.0,     
+    "consecutive_birdies_bonus": 1.0,  
+    "consecutive_bogeys_bonus": -1.0,   
     "finishing_points": [
         {"min": 1, "max": 1, "points": 20.0},
         {"min": 2, "max": 2, "points": 18.0},
