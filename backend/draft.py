@@ -4,7 +4,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-
 @dataclass
 class DraftConfig:
     roster_size: int = 6
@@ -12,20 +11,18 @@ class DraftConfig:
     snake: bool = True
     auto_pick: bool = True
 
-
 @dataclass
 class Pick:
     pick_no: int
-    team: str          # team == display name for user
+    team: str
     athlete_id: str
     name: str
     ts: float
 
-
 @dataclass
 class DraftState:
     config: DraftConfig
-    teams: List[str] = field(default_factory=list)  # ordered list (draft order)
+    teams: List[str] = field(default_factory=list)  # ordered draft order
     started: bool = False
     completed: bool = False
 
@@ -54,7 +51,7 @@ class DraftState:
 
     def start(self):
         if not self.teams:
-            raise ValueError("No teams/users in draft.")
+            raise ValueError("No users in draft.")
         self.started = True
         self.completed = False
         self.deadline_ts = time.time() + self.config.seconds_per_pick

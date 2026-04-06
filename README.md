@@ -9,10 +9,14 @@ cd backend
 pip install -r requirements.txt
 uvicorn app:app --reload --port 8000
 
+To host locally, python -m uvicorn app:app --host 0.0.0.0 --port 8000
+
 ## Run frontend (5173)
 cd frontend
 npm install
 npm run dev
+
+To host locally, npm run dev -- --host 0.0.0.0 --port 5173
 
 ## API
 GET /api/field?limit=50

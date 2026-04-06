@@ -17,22 +17,12 @@ body {
 }
 
 .page { max-width: 1280px; margin: 0 auto; padding: 18px; }
-.topbar { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
-h1 { margin: 0; font-size: 26px; }
-h2 { margin: 0; font-size: 18px; }
+.h1 { margin: 0; font-size: 26px; }
+.h2 { margin: 0; font-size: 18px; }
 .muted { color: var(--muted); margin-top: 6px; }
 
+.topbar { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
 .actions { display: flex; gap: 10px; }
-.btn {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border);
-  padding: 10px 12px;
-  border-radius: 10px;
-  cursor: pointer;
-}
-.btn:hover { border-color: var(--accent); }
-.btn.danger:hover { border-color: var(--danger); }
 
 .layout { display: grid; grid-template-columns: 420px 1fr; gap: 16px; align-items: start; }
 
@@ -43,10 +33,25 @@ h2 { margin: 0; font-size: 18px; }
   padding: 12px;
 }
 
-.cardHeader { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.joinCard { max-width: 520px; margin: 80px auto; }
+.full { width: 100%; }
+
+.btn {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+
+.btn.primary { border-color: rgba(78,161,255,0.55); }
+.btn.primary:hover { border-color: rgba(78,161,255,1); }
 
 .input {
-  width: 55%;
+  width: 100%;
+  margin-top: 10px;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
@@ -60,6 +65,7 @@ h2 { margin: 0; font-size: 18px; }
   overflow: auto;
   border-top: 1px solid var(--border);
 }
+.lobbyList { max-height: 180px; }
 
 .row {
   display: flex;
@@ -85,9 +91,20 @@ h2 { margin: 0; font-size: 18px; }
   font-size: 12px;
 }
 
+.pillHost {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(78,161,255,0.55);
+  color: rgba(78,161,255,1);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .teams { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 .teamHeader { display: flex; justify-content: space-between; align-items: baseline; }
 .total { font-weight: 900; color: var(--accent); }
+
 .empty { padding: 12px 6px; color: var(--muted); }
 
 .picksCard { margin-top: 16px; }
@@ -105,6 +122,15 @@ h2 { margin: 0; font-size: 18px; }
 
 .clickableName { cursor: pointer; }
 .clickableName:hover { text-decoration: underline; }
+
+.error {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 91, 91, 0.35);
+  background: rgba(255, 91, 91, 0.10);
+  color: #ffd2d2;
+  margin-top: 10px;
+}
 
 .modalBackdrop {
   position: fixed; inset: 0;
@@ -132,28 +158,4 @@ h2 { margin: 0; font-size: 18px; }
   align-items: center;
 }
 
-/* add/keep these (works with the earlier dark theme) */
-.error {
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 91, 91, 0.35);
-  background: rgba(255, 91, 91, 0.10);
-  color: #ffd2d2;
-}
-
-.btn.primary {
-  border-color: rgba(78,161,255,0.55);
-}
-.btn.primary:hover {
-  border-color: rgba(78,161,255,1);
-}
-
-.pillHost {
-  margin-left: 8px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(78,161,255,0.55);
-  color: rgba(78,161,255,1);
-  font-size: 12px;
-  font-weight: 700;
-}
+.sectionHeader { display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px; }

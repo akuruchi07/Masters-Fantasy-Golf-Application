@@ -221,4 +221,5 @@ def score_team(team_name, golfers, scoring_rules):
     }
 
 
-
+def points_for_hole(strokes: Optional[int], par: Optional[int]) -> int:
+    return POINTS_BY_RESULT.get(classify_result(strokes, par), POINTS_BY_RESULT["OTHER"])

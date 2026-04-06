@@ -2,11 +2,29 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { connectWS } from "./ws";
 
+function uuid() {
+  // Works on modern browsers
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+
+  // Works on most browsers that have getRandomValues
+  if (globalThis.crypto?.getRandomValues) {
+    const a = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(a);
+    a[6] = (a[6] & 0x0f) | 0x40;
+    a[8] = (a[8] & 0x3f) | 0x80;
+    const hex = [...a].map(b => b.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+  }
+
+  // Last resort fallback
+  return `uid-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 function getOrCreateUserId() {
   const key = "masters_userId";
   let v = localStorage.getItem(key);
   if (!v) {
-    v = crypto.randomUUID();
+    v = uuid();
     localStorage.setItem(key, v);
   }
   return v;
@@ -26,7 +44,6 @@ export default function App() {
   const [error, setError] = useState("");
   const [tournamentLeaderboard, setTournamentLeaderboard] = useState([]);
 
-  // after join: websocket + load field
   useEffect(() => {
     if (!joined) return;
 
@@ -144,7 +161,6 @@ export default function App() {
     setHoleModal({ athleteId, name: playerName, ...data });
   }
 
-  // ----- Screen 1: name entry -----
   if (!joined) {
     return (
       <div className="page">
@@ -179,12 +195,11 @@ export default function App() {
     );
   }
 
-  // ----- Lobby / Draft room -----
   return (
     <div className="page">
       <header className="topbar">
         <div>
-          <h1>Masters Draft Room</h1>
+          <h1 className="h1">Masters Draft Room</h1>
           <div className="muted">
             You are: <b>{me?.name || "…"}</b>{" "}
             {me?.isHost ? <span className="pillHost">HOST</span> : null}
@@ -213,10 +228,9 @@ export default function App() {
       )}
 
       <div className="layout">
-        {/* Left: lobby + available */}
         <section className="card">
-          <h2>Players in Lobby</h2>
-          <div className="list" style={{ maxHeight: 180 }}>
+          <h2 className="h2">Players in Lobby</h2>
+          <div className="list lobbyList">
             {(room?.users || []).map((u) => (
               <div className="row" key={u.userId}>
                 <div className="name">
@@ -343,9 +357,8 @@ export default function App() {
         </section>
       </div>
 
-      {/* Pick history */}
       <section className="card picksCard">
-        <h2>Pick History</h2>
+        <h2 className="h2">Pick History</h2>
         <div className="picks">
           {(draft?.picks || []).map((p) => (
             <div className="pick" key={`${p.pickNo}-${p.athleteId}`}>
@@ -362,7 +375,6 @@ export default function App() {
         </div>
       </section>
 
-      {/* Holes modal */}
       {holeModal && (
         <div className="modalBackdrop" onClick={() => setHoleModal(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>

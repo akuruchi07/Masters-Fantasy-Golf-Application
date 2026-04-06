@@ -1,4 +1,4 @@
-const API = "http://localhost:8000/api";
+const API = `http://${window.location.hostname}:8000/api`;
 
 async function jget(path) {
   const res = await fetch(`${API}${path}`);
@@ -24,7 +24,8 @@ export const api = {
   state: () => jget("/state"),
   startDraft: (userId, cfg) => jpost("/draft/start", { userId, ...cfg }),
   resetDraft: (userId) => jpost("/draft/reset", { userId }),
-  pick: (userId, athleteId, name) => jpost("/draft/pick", { userId, athlete_id: athleteId, name }),
+  pick: (userId, athleteId, name) =>
+    jpost("/draft/pick", { userId, athlete_id: athleteId, name }),
   playerHoles: (athleteId) => jget(`/player/${athleteId}/holes`),
   tournamentLeaderboard: () => jget("/tournament-leaderboard"),
 };

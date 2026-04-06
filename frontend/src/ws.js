@@ -1,22 +1,17 @@
-const API = "http://localhost:8000/api";
+export function connectWS(userId, onMsg) {
+  const WS_URL = `ws://${window.location.hostname}:8000/ws?userId=${encodeURIComponent(userId)}`;
+  const ws = new WebSocket(WS_URL);
 
-async function jget(path) {
-  const res = await fetch(`${API}${path}`);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || `GET ${path} failed`);
-  return data;
-}
+  ws.onopen = () => {
+    const t = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send("ping");
+    }, 10000);
+    ws._pingTimer = t;
+  };
 
-async function jpost(path, body) {
-  const res = await fetch(`${API}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body || {}),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || `POST ${path} failed`);
-  return data;
-}
+  ws.onmessage = (evt) => {
+    try { onMsg(JSON.parse(evt.data)); } catch {}
+  };
 
 export const api = {
   field: (limit = 50) => jget(`/field?limit=${limit}`),
