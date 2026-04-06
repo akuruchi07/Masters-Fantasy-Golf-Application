@@ -24,8 +24,10 @@ export const api = {
   state: () => jget("/state"),
   startDraft: (userId, cfg) => jpost("/draft/start", { userId, ...cfg }),
   resetDraft: (userId) => jpost("/draft/reset", { userId }),
-  pick: (userId, athleteId, name) =>
-    jpost("/draft/pick", { userId, athlete_id: athleteId, name }),
+  pick: (userId, athleteId, name, slot = null) =>
+    jpost("/draft/pick", { userId, athlete_id: athleteId, name, slot }),
+  eligibleSlots: (userId, athleteId) =>
+    jget(`/draft/eligible-slots/${athleteId}?userId=${encodeURIComponent(userId)}`),
   playerHoles: (athleteId) => jget(`/player/${athleteId}/holes`),
   tournamentLeaderboard: () => jget("/tournament-leaderboard"),
 };

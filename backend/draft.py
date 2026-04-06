@@ -2,14 +2,36 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
+
+STARTER_SLOTS = [
+    "past_champion",
+    "international",
+    "american",
+    "non_pga",
+    "wildcard",
+]
+BACKUP_SLOTS = ["backup_1", "backup_2"]
+ALL_SLOTS = STARTER_SLOTS + BACKUP_SLOTS
+
+SLOT_LABELS = {
+    "past_champion": "Past Masters Champion",
+    "international": "International",
+    "american": "American",
+    "non_pga": "Non-PGA Tour",
+    "wildcard": "Wildcard",
+    "backup_1": "Backup 1",
+    "backup_2": "Backup 2",
+}
+
 
 @dataclass
 class DraftConfig:
-    roster_size: int = 6
+    roster_size: int = 7
     seconds_per_pick: int = 60
     snake: bool = True
     auto_pick: bool = True
+
 
 @dataclass
 class Pick:
@@ -17,12 +39,15 @@ class Pick:
     team: str
     athlete_id: str
     name: str
+    slot: str
+    slot_label: str
     ts: float
+
 
 @dataclass
 class DraftState:
     config: DraftConfig
-    teams: List[str] = field(default_factory=list)  # ordered draft order
+    teams: List[str] = field(default_factory=list)
     started: bool = False
     completed: bool = False
 
@@ -33,8 +58,11 @@ class DraftState:
     deadline_ts: Optional[float] = None
 
     picks: List[Pick] = field(default_factory=list)
-    rosters: Dict[str, List[Tuple[str, str]]] = field(default_factory=dict)
+    rosters: Dict[str, Dict[str, Optional[Dict[str, Any]]]] = field(default_factory=dict)
     picked_ids: set[str] = field(default_factory=set)
+
+    def empty_roster(self) -> Dict[str, Optional[Dict[str, Any]]]:
+        return {slot: None for slot in ALL_SLOTS}
 
     def reset_for_teams(self, teams_in_order: List[str]):
         self.teams = list(teams_in_order)
@@ -46,7 +74,7 @@ class DraftState:
         self.team_index = 0
         self.deadline_ts = None
         self.picks = []
-        self.rosters = {t: [] for t in self.teams}
+        self.rosters = {t: self.empty_roster() for t in self.teams}
         self.picked_ids = set()
 
     def start(self):
@@ -61,8 +89,50 @@ class DraftState:
             return None
         return self.teams[self.team_index]
 
+    def roster_for(self, team: str) -> Dict[str, Optional[Dict[str, Any]]]:
+        return self.rosters.setdefault(team, self.empty_roster())
+
+    def roster_count(self, team: str) -> int:
+        return sum(1 for player in self.roster_for(team).values() if player is not None)
+
     def is_team_full(self, team: str) -> bool:
-        return len(self.rosters.get(team, [])) >= self.config.roster_size
+        return self.roster_count(team) >= self.config.roster_size
+
+    def required_slots_filled(self, team: str) -> bool:
+        roster = self.roster_for(team)
+        return all(roster.get(slot) is not None for slot in STARTER_SLOTS)
+
+    def roster_has_player(self, team: str, athlete_id: str) -> bool:
+        roster = self.roster_for(team)
+        return any(player and player.get("athleteId") == athlete_id for player in roster.values())
+
+    def eligible_slots(self, team: str, player_meta: Dict[str, Any]) -> List[str]:
+        roster = self.roster_for(team)
+        valid: List[str] = []
+        starters_done = self.required_slots_filled(team)
+
+        for slot in ALL_SLOTS:
+            if roster.get(slot) is not None:
+                continue
+
+            if slot == "past_champion" and player_meta.get("isPastChampion"):
+                valid.append(slot)
+            elif slot == "international" and player_meta.get("isInternational"):
+                valid.append(slot)
+            elif slot == "american" and player_meta.get("isAmerican"):
+                valid.append(slot)
+            elif slot == "non_pga" and player_meta.get("isNonPga"):
+                valid.append(slot)
+            elif slot == "wildcard":
+                valid.append(slot)
+            elif slot in BACKUP_SLOTS and starters_done:
+                valid.append(slot)
+
+        return valid
+
+    def next_auto_slot(self, team: str, player_meta: Dict[str, Any]) -> Optional[str]:
+        valid = self.eligible_slots(team, player_meta)
+        return valid[0] if len(valid) == 1 else None
 
     def advance_turn(self):
         self.pick_no += 1
@@ -82,7 +152,7 @@ class DraftState:
 
         self.deadline_ts = time.time() + self.config.seconds_per_pick
 
-    def make_pick(self, athlete_id: str, name: str) -> Pick:
+    def make_pick(self, athlete_id: str, name: str, slot: str, player_meta: Dict[str, Any]) -> Pick:
         if not self.started or self.completed:
             raise ValueError("Draft not active.")
         team = self.current_team()
@@ -92,19 +162,35 @@ class DraftState:
             raise ValueError("Team roster full.")
         if athlete_id in self.picked_ids:
             raise ValueError("Already drafted.")
+        if self.roster_has_player(team, athlete_id):
+            raise ValueError("Player already on your roster.")
 
-        p = Pick(
+        valid_slots = self.eligible_slots(team, player_meta)
+        if not valid_slots:
+            raise ValueError("Player does not fit any available slot.")
+        if slot not in valid_slots:
+            raise ValueError("Invalid slot for this player.")
+
+        pick = Pick(
             pick_no=self.pick_no,
             team=team,
             athlete_id=athlete_id,
             name=name,
+            slot=slot,
+            slot_label=SLOT_LABELS[slot],
             ts=time.time(),
         )
-        self.picks.append(p)
-        self.rosters[team].append((athlete_id, name))
+        roster = self.roster_for(team)
+        roster[slot] = {
+            "athleteId": athlete_id,
+            "name": name,
+            "slot": slot,
+            "slotLabel": SLOT_LABELS[slot],
+        }
+        self.picks.append(pick)
         self.picked_ids.add(athlete_id)
         self.advance_turn()
-        return p
+        return pick
 
     def remaining_seconds(self) -> Optional[int]:
         if not self.started or self.completed or self.deadline_ts is None:

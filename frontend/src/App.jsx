@@ -3,20 +3,15 @@ import { api } from "./api";
 import { connectWS } from "./ws";
 
 function uuid() {
-  // Works on modern browsers
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-
-  // Works on most browsers that have getRandomValues
   if (globalThis.crypto?.getRandomValues) {
     const a = new Uint8Array(16);
     globalThis.crypto.getRandomValues(a);
     a[6] = (a[6] & 0x0f) | 0x40;
     a[8] = (a[8] & 0x3f) | 0x80;
-    const hex = [...a].map(b => b.toString(16).padStart(2, "0")).join("");
-    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+    const hex = [...a].map((b) => b.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   }
-
-  // Last resort fallback
   return `uid-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
@@ -30,6 +25,16 @@ function getOrCreateUserId() {
   return v;
 }
 
+function formatCategoryTags(player) {
+  const tags = [];
+  if (player.isPastChampion) tags.push("Past Champion");
+  if (player.isInternational) tags.push("International");
+  if (player.isAmerican) tags.push("American");
+  if (player.isNonPga) tags.push("Non-PGA");
+  if (tags.length === 0) tags.push("Wildcard Only");
+  return tags;
+}
+
 export default function App() {
   const userId = useMemo(() => getOrCreateUserId(), []);
   const [name, setName] = useState(localStorage.getItem("masters_name") || "");
@@ -41,6 +46,7 @@ export default function App() {
 
   const [query, setQuery] = useState("");
   const [holeModal, setHoleModal] = useState(null);
+  const [slotModal, setSlotModal] = useState(null);
   const [error, setError] = useState("");
   const [tournamentLeaderboard, setTournamentLeaderboard] = useState([]);
 
@@ -86,13 +92,14 @@ export default function App() {
     return users.find((u) => u.userId === userId) || null;
   }, [room, userId]);
 
+  const draft = room?.draft;
+  const slotLabels = room?.slotLabels || {};
+  const picked = useMemo(() => new Set(draft?.picked || []), [draft]);
+  const myRoster = me ? draft?.rosters?.[me.name]?.slots || {} : {};
   const myTeam = useMemo(() => {
     if (!me || !scoreboard?.teams) return null;
     return scoreboard.teams[me.name] || null;
   }, [me, scoreboard]);
-
-  const draft = room?.draft;
-  const picked = useMemo(() => new Set(draft?.picked || []), [draft]);
 
   const available = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -113,8 +120,7 @@ export default function App() {
   }, [scoreboard]);
 
   const onClock = draft?.currentTeam;
-  const isMyTurn =
-    !!me && draft?.started && !draft?.completed && onClock === me.name;
+  const isMyTurn = !!me && draft?.started && !draft?.completed && onClock === me.name;
 
   async function doJoin() {
     setError("");
@@ -137,7 +143,7 @@ export default function App() {
     try {
       await api.startDraft(userId, {
         seconds_per_pick: 60,
-        roster_size: 6,
+        roster_size: 7,
         snake: true,
         auto_pick: true,
       });
@@ -146,11 +152,40 @@ export default function App() {
     }
   }
 
+  async function submitDraft(player, slot = null) {
+    const res = await api.pick(userId, player.athleteId, player.name, slot);
+    if (res?.needsSlotSelection) {
+      setSlotModal({ player, slots: res.slots || [] });
+      return;
+    }
+    setSlotModal(null);
+  }
+
   async function draftPlayer(player) {
     setError("");
     if (!isMyTurn) return;
     try {
-      await api.pick(userId, player.athleteId, player.name);
+      const eligible = await api.eligibleSlots(userId, player.athleteId);
+      const slots = eligible.slots || [];
+      if (slots.length === 0) {
+        setError("That player does not fit any open slot on your roster.");
+        return;
+      }
+      if (slots.length > 1) {
+        setSlotModal({ player, slots });
+        return;
+      }
+      await submitDraft(player, slots[0]);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function chooseSlot(slot) {
+    if (!slotModal) return;
+    setError("");
+    try {
+      await submitDraft(slotModal.player, slot);
     } catch (e) {
       setError(e.message);
     }
@@ -166,10 +201,7 @@ export default function App() {
       <div className="page">
         <div className="card" style={{ maxWidth: 520, margin: "80px auto" }}>
           <h1 style={{ marginTop: 0 }}>Join the Draft</h1>
-          <p className="muted">
-            Enter your name to enter the lobby. The host will start the draft.
-          </p>
-
+          <p className="muted">Enter your name to enter the lobby. The host will start the draft.</p>
           <input
             className="input"
             placeholder="Your name"
@@ -180,14 +212,8 @@ export default function App() {
             }}
             style={{ width: "100%" }}
           />
-
           {error && <div className="error">{error}</div>}
-
-          <button
-            className="btn primary"
-            onClick={doJoin}
-            style={{ marginTop: 12, width: "100%" }}
-          >
+          <button className="btn primary" onClick={doJoin} style={{ marginTop: 12, width: "100%" }}>
             Continue
           </button>
         </div>
@@ -201,8 +227,7 @@ export default function App() {
         <div>
           <h1 className="h1">Masters Draft Room</h1>
           <div className="muted">
-            You are: <b>{me?.name || "…"}</b>{" "}
-            {me?.isHost ? <span className="pillHost">HOST</span> : null}
+            You are: <b>{me?.name || "…"}</b> {me?.isHost ? <span className="pillHost">HOST</span> : null}
             {" • "}
             {draft?.started
               ? draft.completed
@@ -211,7 +236,6 @@ export default function App() {
               : "Lobby (draft not started)"}
           </div>
         </div>
-
         <div className="actions">
           {me?.isHost && !draft?.started && (
             <button className="btn primary" onClick={startDraft}>
@@ -221,53 +245,26 @@ export default function App() {
         </div>
       </header>
 
-      {error && (
-        <div className="error" style={{ marginBottom: 10 }}>
-          {error}
-        </div>
-      )}
+      {error && <div className="error" style={{ marginBottom: 10 }}>{error}</div>}
 
-      <div className="layout">
+      <div className="layout threeCol">
         <section className="card">
           <h2 className="h2">Players in Lobby</h2>
           <div className="list lobbyList">
             {(room?.users || []).map((u) => (
               <div className="row" key={u.userId}>
-                <div className="name">
-                  {u.name}{" "}
-                  {u.isHost ? <span className="pillHost">HOST</span> : null}
-                </div>
+                <div className="name">{u.name} {u.isHost ? <span className="pillHost">HOST</span> : null}</div>
               </div>
             ))}
-            {(room?.users || []).length === 0 && (
-              <div className="empty">No one yet.</div>
-            )}
+            {(room?.users || []).length === 0 && <div className="empty">No one yet.</div>}
           </div>
 
-          <div
-            style={{
-              marginTop: 12,
-              display: "flex",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-            }}
-          >
-            <h2>Available (Top 50)</h2>
-            <div className="pill">
-              {draft?.started
-                ? isMyTurn
-                  ? "Your turn"
-                  : `Waiting: ${onClock}`
-                : "Waiting for host"}
-            </div>
+          <div className="sectionHeader">
+            <h2 className="h2">Available (Top 50)</h2>
+            <div className="pill">{draft?.started ? (isMyTurn ? "Your turn" : `Waiting: ${onClock}`) : "Waiting for host"}</div>
           </div>
 
-          <input
-            className="input"
-            placeholder="Search..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <input className="input" placeholder="Search..." value={query} onChange={(e) => setQuery(e.target.value)} />
 
           <div className="list">
             {available.map((p) => (
@@ -279,55 +276,57 @@ export default function App() {
               >
                 <div>
                   <div className="name">{p.name}</div>
-                  <div className="meta">ID: {p.athleteId}</div>
+                  <div className="meta">{formatCategoryTags(p).join(" • ")}</div>
                 </div>
                 <div className="pill">{isMyTurn ? "Draft" : "—"}</div>
               </div>
             ))}
-            {available.length === 0 && (
-              <div className="empty">No available players.</div>
-            )}
+            {available.length === 0 && <div className="empty">No available players.</div>}
           </div>
         </section>
 
-        {/* Right: dashboard */}
-        <section className="teams">
-          {/* MY TEAM */}
-          <div className="card">
-            <div className="teamHeader">
-              <h2>My Team</h2>
-              <div className="total">Total: {myTeam?.total ?? 0}</div>
-            </div>
-
-            <div className="list">
-              {(myTeam?.players || []).map((p) => (
-                <div className="row" key={p.athleteId}>
-                  <div
-                    className="clickableName"
-                    onClick={() => openHoles(p.athleteId, p.name)}
-                  >
-                    <div className="name">{p.name}</div>
-                    <div className="meta">Click for hole-by-hole</div>
-                  </div>
-                  <div className="pts">{p.fantasyPoints ?? 0}</div>
-                </div>
-              ))}
-            </div>
+        <section className="card rosterCard">
+          <div className="teamHeader">
+            <h2 className="h2">My Roster</h2>
+            <div className="total">Total: {myTeam?.total ?? 0}</div>
           </div>
+          <div className="list rosterList">
+            {Object.entries(slotLabels).map(([slot, label]) => {
+              const player = myRoster?.[slot];
+              const scoreRow = (myTeam?.players || []).find((p) => p.slot === slot);
+              const isStarter = (draft?.starterSlots || []).includes(slot);
+              return (
+                <div className="row rosterRow" key={slot}>
+                  <div>
+                    <div className="name">{label}</div>
+                    {player ? (
+                      <>
+                        <div className="clickableName" onClick={() => openHoles(player.athleteId, player.name)}>{player.name}</div>
+                        <div className="meta">
+                          {scoreRow?.status === "missed_cut" ? "Missed cut" : scoreRow?.status === "active_backup" ? "Active backup" : isStarter ? "Starter" : "Backup"}
+                          {typeof scoreRow?.madeCut === "boolean" ? ` • ${scoreRow.madeCut ? "Made cut" : "Missed cut"}` : ""}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="meta">Empty</div>
+                    )}
+                  </div>
+                  <div className="pts">{scoreRow?.fantasyPoints ?? 0}</div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
-          {/* LEAGUE STANDINGS */}
+        <section className="teams">
           <div className="card">
             <h2>League Standings</h2>
             <div className="list">
               {leagueStandings.map((team, idx) => (
                 <div className="row" key={team.teamName}>
                   <div>
-                    <div className="name">
-                      #{idx + 1} {team.teamName}
-                    </div>
-                    <div className="meta">
-                      {team.players.map((p) => p.name).join(", ")}
-                    </div>
+                    <div className="name">#{idx + 1} {team.teamName}</div>
+                    <div className="meta">{team.players.filter((p) => p.name).map((p) => `${p.slotLabel}: ${p.name}`).join(" • ")}</div>
                   </div>
                   <div className="pts">{team.total}</div>
                 </div>
@@ -335,19 +334,14 @@ export default function App() {
             </div>
           </div>
 
-          {/* TOURNAMENT LEADERBOARD */}
           <div className="card">
             <h2>Tournament Leaderboard</h2>
             <div className="list">
               {tournamentLeaderboard.slice(0, 25).map((player, idx) => (
                 <div className="row" key={`${player.golfer_name}-${idx}`}>
                   <div>
-                    <div className="name">
-                      #{idx + 1} {player.golfer_name}
-                    </div>
-                    <div className="meta">
-                      Base: {player.base_points} • Bonus: {player.bonus_points}
-                    </div>
+                    <div className="name">#{idx + 1} {player.golfer_name}</div>
+                    <div className="meta">Base: {player.base_points} • Bonus: {player.bonus_points}</div>
                   </div>
                   <div className="pts">{player.fantasy_points}</div>
                 </div>
@@ -365,15 +359,34 @@ export default function App() {
               <div className="pickNo">#{p.pickNo}</div>
               <div className="pickBody">
                 <div className="pickName">{p.name}</div>
-                <div className="pickMeta">{p.team}</div>
+                <div className="pickMeta">{p.team} • {p.slotLabel}</div>
               </div>
             </div>
           ))}
-          {(draft?.picks || []).length === 0 && (
-            <div className="empty">No picks yet.</div>
-          )}
+          {(draft?.picks || []).length === 0 && <div className="empty">No picks yet.</div>}
         </div>
       </section>
+
+      {slotModal && (
+        <div className="modalBackdrop" onClick={() => setSlotModal(null)}>
+          <div className="modal smallModal" onClick={(e) => e.stopPropagation()}>
+            <div className="modalHeader">
+              <div>
+                <div className="modalTitle">Choose a slot for {slotModal.player.name}</div>
+                <div className="muted">This player qualifies for multiple categories.</div>
+              </div>
+              <button className="btn" onClick={() => setSlotModal(null)}>Close</button>
+            </div>
+            <div className="slotChoices">
+              {slotModal.slots.map((slot) => (
+                <button key={slot} className="btn slotBtn" onClick={() => chooseSlot(slot)}>
+                  {slotLabels[slot] || slot}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {holeModal && (
         <div className="modalBackdrop" onClick={() => setHoleModal(null)}>
@@ -381,15 +394,10 @@ export default function App() {
             <div className="modalHeader">
               <div>
                 <div className="modalTitle">{holeModal.name}</div>
-                <div className="muted">
-                  Fantasy points: {holeModal.fantasyPoints ?? 0}
-                </div>
+                <div className="muted">Fantasy points: {holeModal.fantasyPoints ?? 0}</div>
               </div>
-              <button className="btn" onClick={() => setHoleModal(null)}>
-                Close
-              </button>
+              <button className="btn" onClick={() => setHoleModal(null)}>Close</button>
             </div>
-
             <div className="holes">
               {(holeModal.holes || []).map((h) => (
                 <div className="holeRow" key={`${h.round}-${h.hole}`}>
@@ -401,11 +409,7 @@ export default function App() {
                   <div className="pts">{h.points}</div>
                 </div>
               ))}
-              {(holeModal.holes || []).length === 0 && (
-                <div className="empty">
-                  Hole-by-hole provider is currently stubbed.
-                </div>
-              )}
+              {(holeModal.holes || []).length === 0 && <div className="empty">Hole-by-hole provider is currently stubbed.</div>}
             </div>
           </div>
         </div>
