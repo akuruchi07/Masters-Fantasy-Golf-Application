@@ -43,20 +43,14 @@ function playerMatchesFilter(player, filter) {
   return true;
 }
 
-const FILTER_TO_SLOT = {
-  past_champion: "past_champion",
-  international: "international",
-  american: "american",
-  non_pga: "non_pga",
-};
-
-const FILTER_LABELS = {
-  all: "All",
-  past_champion: "Past Champion",
-  international: "International",
-  american: "American",
-  non_pga: "Non-PGA",
-};
+function playerQualifiesForSlot(player, slot) {
+  if (slot === "past_champion") return !!player?.isPastChampion;
+  if (slot === "international") return !!player?.isInternational;
+  if (slot === "american") return !!player?.isAmerican;
+  if (slot === "non_pga") return !!player?.isNonPga;
+  if (slot === "wildcard") return true;
+  return false;
+}
 
 function ScoreBreakdown({ basePoints = 0, bonusPoints = 0, placementBonus = 0, onOpenBreakdown }) {
   const hasPlacement = Number(placementBonus) !== 0;
@@ -136,8 +130,7 @@ function aggregateNestedBreakdown(nested) {
 
 function buildColumnDraftBoard(teams, picks) {
   if (!Array.isArray(teams) || teams.length === 0) return [];
-  const pickCount = Array.isArray(picks) ? picks.length : 0;
-  const totalRounds = Math.max(7, Math.ceil(pickCount / teams.length));
+  const totalRounds = 7;
   const columns = teams.map((team) => ({
     team,
     rounds: Array.from({ length: totalRounds }, (_, idx) => ({
@@ -170,11 +163,6 @@ function TeamDetailModal({ team, onClose, onOpenBreakdown, onOpenHoles }) {
           <div>
             <div className="modalTitle">{team.teamName}</div>
             <div className="meta">Team total: {team.total ?? 0}</div>
-            {team.teamBonuses?.starterMadeCut?.total ? (
-              <div className="meta">
-                {team.teamBonuses.starterMadeCut.label}: {team.teamBonuses.starterMadeCut.count} × {team.teamBonuses.starterMadeCut.pointsEach} = {team.teamBonuses.starterMadeCut.total}
-              </div>
-            ) : null}
           </div>
           <button className="btn" onClick={onClose}>Close</button>
         </div>
@@ -336,28 +324,49 @@ export default function App() {
   const slotLabels = safeObject(room?.slotLabels);
   const picked = useMemo(() => new Set(Array.isArray(draft?.picked) ? draft.picked : []), [draft]);
   const myRoster = me ? safeObject(draft?.rosters?.[me.name]?.slots) : {};
-  const neededFilters = useMemo(() => {
-    const starterSlots = Array.isArray(draft?.starterSlots) ? draft.starterSlots : [];
-    return starterSlots
-      .filter((slot) => !myRoster?.[slot] && FILTER_TO_SLOT[slot])
-      .map((slot) => slot);
-  }, [draft?.starterSlots, myRoster]);
   const myTeam = useMemo(() => {
     if (!me || !scoreboard?.teams) return null;
     return scoreboard.teams[me.name] || null;
   }, [me, scoreboard]);
+
+  const starterSlots = Array.isArray(draft?.starterSlots) ? draft.starterSlots : [];
+  const myNeededStarterSlots = useMemo(
+    () => starterSlots.filter((slot) => !myRoster?.[slot]),
+    [starterSlots, myRoster]
+  );
+  const currentRound = draft?.teams?.length ? Math.ceil((draft?.pickNo || 1) / draft.teams.length) : 1;
+  const suggestionTeamName = draft?.started && !draft?.completed ? draft?.currentTeam : me?.name;
+  const suggestionRoster = safeObject(draft?.rosters?.[suggestionTeamName]?.slots);
+  const suggestionNeededStarterSlots = starterSlots.filter((slot) => !suggestionRoster?.[slot]);
+  const bestAvailable = useMemo(() => {
+    const sorted = [...available].sort((a, b) => (a?.oddsRank || 9999) - (b?.oddsRank || 9999));
+    if (!suggestionTeamName) return sorted.slice(0, 6);
+
+    const preferred = [];
+    const seen = new Set();
+    for (const slot of suggestionNeededStarterSlots) {
+      const match = sorted.find((player) => playerQualifiesForSlot(player, slot) && !seen.has(player.athleteId));
+      if (match) {
+        preferred.push({ ...match, suggestedSlot: slot });
+        seen.add(match.athleteId);
+      }
+    }
+
+    for (const player of sorted) {
+      if (preferred.length >= 6) break;
+      if (seen.has(player.athleteId)) continue;
+      preferred.push({ ...player, suggestedSlot: suggestionNeededStarterSlots[0] || "wildcard" });
+      seen.add(player.athleteId);
+    }
+    return preferred.slice(0, 6);
+  }, [available, suggestionNeededStarterSlots, suggestionTeamName]);
 
   const available = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (Array.isArray(field) ? field : [])
       .filter((p) => !picked.has(p.athleteId))
       .filter((p) => playerMatchesFilter(p, categoryFilter))
-      .filter((p) => (q ? (p?.name || "").toLowerCase().includes(q) : true))
-      .sort((a, b) => {
-        const rankDiff = (a?.oddsRank ?? 999) - (b?.oddsRank ?? 999);
-        if (rankDiff !== 0) return rankDiff;
-        return (a?.name || "").localeCompare(b?.name || "");
-      });
+      .filter((p) => (q ? (p?.name || "").toLowerCase().includes(q) : true));
   }, [field, picked, query, categoryFilter]);
 
   const leagueStandings = useMemo(() => {
@@ -368,7 +377,6 @@ export default function App() {
         total: data?.total || 0,
         players: Array.isArray(data?.players) ? data.players : [],
         missedStarterSlots: Array.isArray(data?.missedStarterSlots) ? data.missedStarterSlots : [],
-        teamBonuses: safeObject(data?.teamBonuses),
       }))
       .sort((a, b) => b.total - a.total);
   }, [scoreboard]);
@@ -569,8 +577,6 @@ export default function App() {
   }
 
   function renderColumnDraftBoard() {
-    const currentRound = draft?.pickNo && draft?.teams?.length ? Math.ceil(draft.pickNo / draft.teams.length) : null;
-
     return (
       <section className="card picksCard">
         <div className="sectionHeader">
@@ -586,24 +592,15 @@ export default function App() {
             >
               <div className="draftColumnHeader">
                 <span>{column.team}</span>
-                {draft?.currentTeam === column.team && !draft?.completed ? <span className="onClockBadge">On the clock</span> : null}
+                {draft?.currentTeam === column.team && !draft?.completed ? <span className="currentPickMarker" /> : null}
               </div>
-              {column.rounds.map((round) => {
-                const isCurrentPick = !draft?.completed && draft?.started && draft?.currentTeam === column.team && currentRound === round.round && !round.pick;
-                return (
-                  <div
-                    className={`draftColumnCell ${isCurrentPick ? "draftColumnCellCurrent" : ""}`}
-                    key={`${column.team}-${round.round}`}
-                  >
-                    <div className="draftColumnCellTop">
-                      <div className="draftColumnRound">R{round.round}</div>
-                      {isCurrentPick ? <span className="currentPickIndicator" aria-label="Current pick" /> : null}
-                    </div>
-                    <div className="draftColumnPlayer">{round.pick?.name || "—"}</div>
-                    <div className="draftColumnMeta">{round.pick?.slotLabel || (isCurrentPick ? "Current Pick" : "")}</div>
-                  </div>
-                );
-              })}
+              {column.rounds.map((round) => (
+                <div className={`draftColumnCell ${draft?.currentTeam === column.team && round.round === currentRound && !round.pick && !draft?.completed ? "draftColumnCellCurrent" : ""}`} key={`${column.team}-${round.round}`}>
+                  <div className="draftColumnRound">R{round.round}</div>
+                  <div className="draftColumnPlayer">{round.pick?.name || "—"}</div>
+                  <div className="draftColumnMeta">{round.pick?.slotLabel || ""}</div>
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -698,30 +695,129 @@ export default function App() {
             </div>
           </section>
 
-          <section className="card">
-            <h2 className="h2">Lobby / Draft Status</h2>
-            <div className="list lobbyList">
-              {(Array.isArray(room?.users) ? room.users : []).map((u) => (
-                <div className="row" key={u.userId}>
-                  <div className="name">
-                    {u.name} {u.isHost ? <span className="pillHost">HOST</span> : null}
-                  </div>
-                </div>
-              ))}
-            </div>
+          <section className="card rulesTeaserCard">
+            <h2 className="h2">League Rules</h2>
+            <p className="meta rulesTeaserText">
+              See roster requirements, snake draft flow, scoring bonuses, backups, and cut rules in one place.
+            </p>
+            <button className="btn primary" onClick={() => setViewMode("rules")}>Open Rules</button>
           </section>
         </div>
       </>
     );
   }
 
+  function renderRulesView() {
+    const starterBonus = 6;
+    return (
+      <div className="rulesLayout">
+        <section className="card rulesHeroCard">
+          <div className="dashboardEyebrow">Masters Weekend Pool</div>
+          <h2 className="dashboardTitle">Rules & Scoring</h2>
+          <p className="rulesIntro">
+            Every roster has 7 spots: 5 starters and 2 backups. The draft runs as a snake draft, starters must be filled before backups,
+            and only starters earn the made-cut team bonus.
+          </p>
+        </section>
+
+        <section className="card rulesSection">
+          <h3 className="rulesSectionTitle">Roster Build</h3>
+          <div className="rulesGrid">
+            {starterSlots.map((slot) => (
+              <div key={slot} className="rulePillCard">
+                <div className="ruleLabel">Starter</div>
+                <div className="ruleValue">{slotLabels[slot] || slot}</div>
+              </div>
+            ))}
+            {(Array.isArray(draft?.backupSlots) ? draft.backupSlots : []).map((slot) => (
+              <div key={slot} className="rulePillCard">
+                <div className="ruleLabel">Backup</div>
+                <div className="ruleValue">{slotLabels[slot] || slot}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="card rulesSection">
+          <h3 className="rulesSectionTitle">Draft Rules</h3>
+          <ul className="rulesList">
+            <li>The host randomizes the draft order when the draft starts.</li>
+            <li>The draft is a true snake: 1 → N in round 1, then N → 1 in round 2.</li>
+            <li>You must fill all 5 starter categories before you can draft Backup 1 or Backup 2.</li>
+            <li>Auto draft follows the odds-based board and fills the earliest valid open slot.</li>
+            <li>No golfer can be drafted twice anywhere in the room.</li>
+          </ul>
+        </section>
+
+        <section className="card rulesSection">
+          <h3 className="rulesSectionTitle">Scoring Summary</h3>
+          <ul className="rulesList">
+            <li>Hole-by-hole fantasy points still drive most of the scoring.</li>
+            <li>Placement bonuses still reward golfers who finish near the top of the Masters leaderboard.</li>
+            <li>Each starter who makes the cut adds a <strong>+{starterBonus}</strong> team bonus.</li>
+            <li>Backups can replace missed-cut starters in scoring, but backups do <strong>not</strong> earn the made-cut team bonus.</li>
+            <li>That keeps strong drafting valuable while still letting smart backup coverage stay competitive.</li>
+          </ul>
+        </section>
+
+        <section className="card rulesSection">
+          <h3 className="rulesSectionTitle">Category Notes</h3>
+          <ul className="rulesList">
+            <li>Nationality tags were rechecked against the official 2026 Masters player listings.</li>
+            <li>Patrick Reed is treated as American on the draft board.</li>
+            <li>The non-PGA bucket is reserved for players currently outside the PGA Tour lane used by the app.</li>
+          </ul>
+        </section>
+      </div>
+    );
+  }
+
   function renderDraftView() {
     return (
       <>
-        <div className="draftLayout">
-          <section className="card">
+        <section className="card draftStatusBanner">
+          <div className="draftStatusMain">
+            <div>
+              <div className="dashboardEyebrow">Draft Room</div>
+              <h2 className="dashboardTitle draftRoomTitle">{draft?.completed ? "Draft Complete" : draft?.started ? "Draft Live" : "Waiting for Host"}</h2>
+              <div className="draftStatusMetaRow">
+                <span className="statusBadge">{draft?.started ? (draft?.completed ? "Completed" : "In Progress") : "Lobby"}</span>
+                <span className="statusText">On the clock: <strong>{onClock || "—"}</strong></span>
+                <span className="statusText">Round {currentRound}</span>
+                <span className="statusText">Pick {draft?.pickNo || 1} / {draft?.totalPicks || 0}</span>
+              </div>
+            </div>
+            <div className="draftClockWrap">
+              <div className="draftClockValue">{liveSeconds}s</div>
+              <div className="meta">time left</div>
+            </div>
+          </div>
+
+          <div className="draftStatusSide">
+            <div className="draftLobbyCard">
+              <div className="draftLobbyTitle">Lobby</div>
+              <div className="draftLobbyList">
+                {(Array.isArray(room?.users) ? room.users : []).map((u) => (
+                  <div className={`draftLobbyUser ${draft?.currentTeam === u.name && !draft?.completed ? "draftLobbyUserOnClock" : ""}`} key={u.userId}>
+                    <span>{u.name}</span>
+                    <span className="draftLobbyMeta">{u.isHost ? "HOST" : draft?.currentTeam === u.name && !draft?.completed ? "ON THE CLOCK" : ""}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {me?.isHost && !draft?.started ? (
+              <button className="btn primary draftStartBtn" onClick={startDraft}>Start Draft</button>
+            ) : null}
+          </div>
+        </section>
+
+        <div className="draftLayoutEnhanced">
+          <section className="card availablePlayersCard">
             <div className="sectionHeader">
-              <h2 className="h2">Available Players</h2>
+              <div>
+                <h2 className="h2">Available Players</h2>
+                <div className="meta">Odds rank and category tags are shown to speed up picks.</div>
+              </div>
               <div className="draftControls">
                 <div className="pill">
                   {draft?.started ? (isMyTurn ? "Your turn" : `Waiting: ${onClock}`) : "Waiting for host"}
@@ -734,149 +830,89 @@ export default function App() {
               </div>
             </div>
 
-            <input className="input" placeholder="Search..." value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input className="input" placeholder="Search players..." value={query} onChange={(e) => setQuery(e.target.value)} />
 
             <div className="filterRow">
-              {Object.entries(FILTER_LABELS).map(([filterKey, filterLabel]) => {
-                const isNeeded = neededFilters.includes(filterKey);
+              <button className={`filterChip ${categoryFilter === "all" ? "active" : ""}`} onClick={() => setCategoryFilter("all")}>All</button>
+              {starterSlots.map((slot) => {
+                const needed = myNeededStarterSlots.includes(slot);
+                const active = categoryFilter === slot;
                 return (
-                  <button
-                    key={filterKey}
-                    className={`filterChip ${categoryFilter === filterKey ? "active" : ""} ${isNeeded ? "neededFilterChip" : ""}`}
-                    onClick={() => setCategoryFilter(filterKey)}
-                  >
-                    <span>{filterLabel}</span>
-                    {isNeeded ? <span className="filterNeedBadge">Needed</span> : null}
+                  <button key={slot} className={`filterChip ${active ? "active" : ""} ${needed ? "neededFilterChip" : ""}`} onClick={() => setCategoryFilter(slot)}>
+                    {slotLabels[slot] || slot}
+                    {needed ? <span className="neededBadge">Needed</span> : null}
                   </button>
                 );
               })}
             </div>
 
-            {neededFilters.length ? (
-              <div className="neededFiltersHint">
-                Still need: {neededFilters.map((filterKey) => FILTER_LABELS[filterKey]).join(", ")}
-              </div>
-            ) : (
-              <div className="neededFiltersHint neededFiltersHintComplete">
-                All required starter categories are filled. You can draft any remaining backups.
-              </div>
-            )}
+            <div className="needStrip">
+              {myNeededStarterSlots.length ? (
+                <span>Fill required categories before backups</span>
+              ) : (
+                <span className="needStripDone">All starter categories filled. Backups unlocked.</span>
+              )}
+            </div>
 
-            <div className="list">
+            <div className="list playerPoolList">
               {available.map((p) => (
                 <div
-                  className={`row ${isMyTurn ? "clickable" : ""}`}
+                  className={`playerCard ${isMyTurn ? "clickable" : ""}`}
                   key={p.athleteId}
                   onClick={() => isMyTurn && draftPlayer(p)}
                   title={isMyTurn ? "Click to draft" : "Not your turn"}
                 >
-                  <div>
-                    <div className="name">{p.name}</div>
-                    <div className="tagRow">
-                      {getCategoryTags(p).map((tag) => (
-                        <span key={tag} className="categoryTag">{tag}</span>
-                      ))}
+                  <div className="playerCardLeft">
+                    <img className="playerAvatar" src={p.avatarUrl} alt={p.name} />
+                    <div>
+                      <div className="playerNameRow">
+                        <div className="name">{p.name}</div>
+                        <span className="oddsBadge">{p.oddsLabel || `#${p.oddsRank || "—"}`}</span>
+                      </div>
+                      <div className="tagRow">
+                        {getCategoryTags(p).map((tag) => (
+                          <span key={tag} className="categoryTag">{tag}</span>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <div className="pill">{isMyTurn ? "Draft" : `#${(p?.oddsRank ?? 998) + 1}`}</div>
+                  <div className="playerCardRight">
+                    <div className="meta">Rank #{p.oddsRank || "—"}</div>
+                    <div className="pill">{isMyTurn ? "Draft" : "View"}</div>
+                  </div>
                 </div>
               ))}
             </div>
           </section>
 
-          {renderMyTeamCard()}
+          <div className="draftSidebarStack">
+            <section className="card">
+              <div className="sectionHeader">
+                <h2 className="h2">Best Available</h2>
+                <div className="pill">{suggestionTeamName || "Board"}</div>
+              </div>
+              <div className="bestAvailableList">
+                {bestAvailable.map((player) => (
+                  <button key={player.athleteId} className="bestAvailableCard" onClick={() => isMyTurn && draftPlayer(player)}>
+                    <img className="bestAvailableAvatar" src={player.avatarUrl} alt={player.name} />
+                    <div className="bestAvailableBody">
+                      <div className="bestAvailableTop">
+                        <span className="name">{player.name}</span>
+                        <span className="oddsBadge">{player.oddsLabel || `#${player.oddsRank}`}</span>
+                      </div>
+                      <div className="meta">Best fit: {slotLabels[player.suggestedSlot] || "Wildcard"}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {renderMyTeamCard()}
+          </div>
         </div>
 
         {renderColumnDraftBoard()}
       </>
-    );
-  }
-
-  function renderRulesView() {
-    return (
-      <div className="rulesLayout">
-        <section className="card rulesCard">
-          <div className="sectionHeader">
-            <h2 className="h2">League Rules</h2>
-            <div className="pill">7-player roster</div>
-          </div>
-
-          <div className="rulesGrid">
-            <div className="rulesSection">
-              <h3>Draft format</h3>
-              <div className="rulesList">
-                <div className="rulesItem"><strong>Snake draft:</strong> the draft reverses every round, so the last pick in one round gets the first pick in the next.</div>
-                <div className="rulesItem"><strong>Roster size:</strong> 5 starters and 2 backups.</div>
-                <div className="rulesItem"><strong>No duplicates:</strong> once a golfer is drafted, nobody else can take him.</div>
-                <div className="rulesItem"><strong>Multi-category golfers:</strong> if a golfer qualifies for more than one starter slot, the drafter chooses where to place him.</div>
-                <div className="rulesItem"><strong>Backups unlock last:</strong> backup slots can only be filled after all 5 starter categories are filled.</div>
-                <div className="rulesItem"><strong>Auto draft:</strong> the app fills your next open slot with the highest-ranked remaining golfer in the current odds-based priority list.</div>
-              </div>
-            </div>
-
-            <div className="rulesSection">
-              <h3>Starter categories</h3>
-              <div className="rulesList">
-                <div className="rulesItem"><strong>Past Champion:</strong> any former Masters winner.</div>
-                <div className="rulesItem"><strong>International:</strong> non-U.S. player.</div>
-                <div className="rulesItem"><strong>American:</strong> U.S. player.</div>
-                <div className="rulesItem"><strong>Non-PGA:</strong> player currently outside the normal PGA Tour schedule.</div>
-                <div className="rulesItem"><strong>Wildcard:</strong> any golfer in the field.</div>
-              </div>
-            </div>
-
-            <div className="rulesSection">
-              <h3>How backups work</h3>
-              <div className="rulesList">
-                <div className="rulesItem"><strong>Missed-cut starters still keep their Round 1-2 points.</strong></div>
-                <div className="rulesItem"><strong>Backup 1</strong> activates if your first starter misses the cut.</div>
-                <div className="rulesItem"><strong>Backup 2</strong> activates if a second starter misses the cut.</div>
-                <div className="rulesItem"><strong>Active backups only score weekend golf:</strong> Rounds 3-4 plus any placement bonus they earn.</div>
-                <div className="rulesItem"><strong>Benched backups</strong> score nothing.</div>
-              </div>
-            </div>
-
-            <div className="rulesSection rulesSectionWide">
-              <h3>Scoring</h3>
-              <div className="rulesScoreTableWrap">
-                <table className="rulesScoreTable">
-                  <thead>
-                    <tr><th>Event</th><th>Points</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr><td>Albatross</td><td>+20</td></tr>
-                    <tr><td>Eagle</td><td>+8</td></tr>
-                    <tr><td>Birdie</td><td>+3</td></tr>
-                    <tr><td>Par</td><td>+0.5</td></tr>
-                    <tr><td>Bogey</td><td>-0.5</td></tr>
-                    <tr><td>Double bogey or worse</td><td>-1</td></tr>
-                    <tr><td>Hole-in-one</td><td>+10 bonus</td></tr>
-                    <tr><td>3 birdies in a row</td><td>+3 bonus</td></tr>
-                    <tr><td>Bogey-free round</td><td>+3 bonus</td></tr>
-                    <tr><td>Round under 70</td><td>+5 bonus</td></tr>
-                    <tr><td>Starter made cut</td><td>+6 team bonus</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="rulesSection rulesSectionWide">
-              <h3>Placement bonus</h3>
-              <div className="rulesPlacementGrid">
-                <div className="rulesPlacementItem">1st: +30</div>
-                <div className="rulesPlacementItem">2nd: +20</div>
-                <div className="rulesPlacementItem">3rd: +18</div>
-                <div className="rulesPlacementItem">4th: +16</div>
-                <div className="rulesPlacementItem">5th: +14</div>
-                <div className="rulesPlacementItem">6th-10th: +10</div>
-                <div className="rulesPlacementItem">11th-15th: +8</div>
-                <div className="rulesPlacementItem">16th-20th: +6</div>
-                <div className="rulesPlacementItem">21st-25th: +4</div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
     );
   }
 
