@@ -127,6 +127,7 @@ NON_PGA_TOUR = {
     "sergio-garcia",
     "tyrrell-hatton",
     "dustin-johnson",
+    "brooks-koepka",
     "tom-mckibbin",
     "carlos-ortiz",
     "jon-rahm",
@@ -532,6 +533,10 @@ def player_holes(athlete_id: str):
             "bonusPoints": 0,
             "placementBonus": 0,
             "scoringHighlights": [],
+            "baseBreakdown": {},
+            "bonusBreakdown": {},
+            "placementBreakdown": {},
+            "roundPoints": {},
         }
 
     return {
@@ -543,6 +548,10 @@ def player_holes(athlete_id: str):
         "placementBonus": sc.placement_bonus,
         "madeCut": sc.made_cut,
         "scoringHighlights": sc.scoring_highlights,
+        "baseBreakdown": sc.round_base_breakdown,
+        "bonusBreakdown": sc.round_bonus_breakdown,
+        "placementBreakdown": sc.placement_breakdown,
+        "roundPoints": sc.round_points,
         "holes": [
             {
                 "round": h.round,

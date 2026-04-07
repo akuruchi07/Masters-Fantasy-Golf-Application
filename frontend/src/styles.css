@@ -278,7 +278,7 @@ body {
 }
 
 .smallModal {
-  width: min(540px, 100%);
+  width: min(680px, 100%);
 }
 
 .modalHeader {
@@ -383,15 +383,21 @@ body {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 6px;
-  font-size: 11px;
-  color: var(--muted);
 }
 
-.scoreBreakdown span {
+.scoreChipButton {
   padding: 3px 8px;
   border-radius: 999px;
   background: rgba(255,255,255,0.04);
   border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.scoreChipButton:hover {
+  border-color: var(--accent);
+  color: var(--text);
 }
 
 .highlightRow {
@@ -409,6 +415,74 @@ body {
   color: #ffd98a;
   font-size: 11px;
   font-weight: 700;
+}
+
+.breakdownSection {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.breakdownTotal {
+  font-size: 14px;
+}
+
+.breakdownCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: #0f1116;
+}
+
+.breakdownCardTitle {
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.breakdownRounds {
+  display: grid;
+  gap: 8px;
+}
+
+.breakdownRoundRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.breakdownRoundRow:last-child {
+  border-bottom: none;
+}
+
+.breakdownTotalValue {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--accent);
+}
+
+.breakdownTableWrap {
+  overflow-x: auto;
+}
+
+.breakdownTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.breakdownTable th,
+.breakdownTable td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.breakdownTable th {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 12px;
 }
 
 .dashboardHero {
