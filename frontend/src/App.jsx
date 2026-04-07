@@ -43,6 +43,30 @@ function playerMatchesFilter(player, filter) {
   return true;
 }
 
+function ScoreBreakdown({ basePoints = 0, bonusPoints = 0, placementBonus = 0 }) {
+  const hasPlacement = Number(placementBonus) !== 0;
+  return (
+    <div className="scoreBreakdown">
+      <span>Base {basePoints ?? 0}</span>
+      <span>Bonus {bonusPoints ?? 0}</span>
+      {hasPlacement ? <span>Place {placementBonus}</span> : null}
+    </div>
+  );
+}
+
+function HighlightsRow({ highlights = [] }) {
+  if (!highlights || highlights.length === 0) return null;
+  return (
+    <div className="highlightRow">
+      {highlights.slice(0, 4).map((item, idx) => (
+        <span className="highlightTag" key={`${item}-${idx}`}>
+          {item}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
   const userId = useMemo(() => getOrCreateUserId(), []);
   const [name, setName] = useState(localStorage.getItem("masters_name") || "");
@@ -261,7 +285,7 @@ export default function App() {
 
             return (
               <div className="row rosterRow" key={slot}>
-                <div>
+                <div className="rosterMain">
                   <div className={`name ${showMissingRequired ? "missingCategoryText" : ""}`}>
                     {label}
                   </div>
@@ -282,6 +306,12 @@ export default function App() {
                           ? ` • ${scoreRow.madeCut ? "Made cut" : "Missed cut"}`
                           : ""}
                       </div>
+                      <ScoreBreakdown
+                        basePoints={scoreRow?.basePoints}
+                        bonusPoints={scoreRow?.bonusPoints}
+                        placementBonus={scoreRow?.placementBonus}
+                      />
+                      <HighlightsRow highlights={scoreRow?.scoringHighlights} />
                     </>
                   ) : (
                     <div className={`meta ${showMissingRequired ? "missingCategoryText" : ""}`}>
@@ -332,6 +362,16 @@ export default function App() {
                     : "Scoring"
                   : "No player assigned"}
               </div>
+              {p.name ? (
+                <>
+                  <ScoreBreakdown
+                    basePoints={p.basePoints}
+                    bonusPoints={p.bonusPoints}
+                    placementBonus={p.placementBonus}
+                  />
+                  <HighlightsRow highlights={p.scoringHighlights} />
+                </>
+              ) : null}
             </div>
           ))}
         </div>
@@ -423,10 +463,15 @@ export default function App() {
             <h2 className="h2">Tournament Leaderboard</h2>
             <div className="list">
               {tournamentLeaderboard.slice(0, 25).map((player, idx) => (
-                <div className="row" key={`${player.golfer_name}-${idx}`}>
-                  <div>
+                <div className="row leaderboardRow" key={`${player.golfer_name}-${idx}`}>
+                  <div className="leaderboardMain">
                     <div className="name">#{idx + 1} {player.golfer_name}</div>
-                    <div className="meta">Base: {player.base_points} • Bonus: {player.bonus_points}</div>
+                    <ScoreBreakdown
+                      basePoints={player.base_points}
+                      bonusPoints={player.bonus_points}
+                      placementBonus={player.placement_bonus}
+                    />
+                    <HighlightsRow highlights={player.highlights} />
                   </div>
                   <div className="pts">{player.fantasy_points}</div>
                 </div>
@@ -482,34 +527,19 @@ export default function App() {
             />
 
             <div className="filterRow">
-              <button
-                className={`filterChip ${categoryFilter === "all" ? "active" : ""}`}
-                onClick={() => setCategoryFilter("all")}
-              >
+              <button className={`filterChip ${categoryFilter === "all" ? "active" : ""}`} onClick={() => setCategoryFilter("all")}>
                 All
               </button>
-              <button
-                className={`filterChip ${categoryFilter === "past_champion" ? "active" : ""}`}
-                onClick={() => setCategoryFilter("past_champion")}
-              >
+              <button className={`filterChip ${categoryFilter === "past_champion" ? "active" : ""}`} onClick={() => setCategoryFilter("past_champion")}>
                 Past Champion
               </button>
-              <button
-                className={`filterChip ${categoryFilter === "international" ? "active" : ""}`}
-                onClick={() => setCategoryFilter("international")}
-              >
+              <button className={`filterChip ${categoryFilter === "international" ? "active" : ""}`} onClick={() => setCategoryFilter("international")}>
                 International
               </button>
-              <button
-                className={`filterChip ${categoryFilter === "american" ? "active" : ""}`}
-                onClick={() => setCategoryFilter("american")}
-              >
+              <button className={`filterChip ${categoryFilter === "american" ? "active" : ""}`} onClick={() => setCategoryFilter("american")}>
                 American
               </button>
-              <button
-                className={`filterChip ${categoryFilter === "non_pga" ? "active" : ""}`}
-                onClick={() => setCategoryFilter("non_pga")}
-              >
+              <button className={`filterChip ${categoryFilter === "non_pga" ? "active" : ""}`} onClick={() => setCategoryFilter("non_pga")}>
                 Non-PGA
               </button>
             </div>
@@ -589,15 +619,9 @@ export default function App() {
         </div>
 
         <div className="actions">
-          <button className="btn" onClick={() => setViewMode("dashboard")}>
-            Standings
-          </button>
-          <button className="btn" onClick={() => setViewMode("draft")}>
-            Draft Room
-          </button>
-          <button className="btn" onClick={() => setViewMode("auto")}>
-            Auto View
-          </button>
+          <button className="btn" onClick={() => setViewMode("dashboard")}>Standings</button>
+          <button className="btn" onClick={() => setViewMode("draft")}>Draft Room</button>
+          <button className="btn" onClick={() => setViewMode("auto")}>Auto View</button>
 
           {me?.isHost && !draft?.started && (
             <button className="btn primary" onClick={startDraft}>
@@ -636,9 +660,7 @@ export default function App() {
                 <div className="muted">This player qualifies for multiple categories.</div>
                 <div className="tagRow">
                   {getCategoryTags(slotModal.player).map((tag) => (
-                    <span key={tag} className="categoryTag">
-                      {tag}
-                    </span>
+                    <span key={tag} className="categoryTag">{tag}</span>
                   ))}
                 </div>
               </div>
@@ -663,6 +685,12 @@ export default function App() {
               <div>
                 <div className="modalTitle">{holeModal.name}</div>
                 <div className="muted">Fantasy points: {holeModal.fantasyPoints ?? 0}</div>
+                <ScoreBreakdown
+                  basePoints={holeModal.basePoints}
+                  bonusPoints={holeModal.bonusPoints}
+                  placementBonus={holeModal.placementBonus}
+                />
+                <HighlightsRow highlights={holeModal.scoringHighlights} />
               </div>
               <button className="btn" onClick={() => setHoleModal(null)}>Close</button>
             </div>
@@ -675,7 +703,10 @@ export default function App() {
                   <div>Par {h.par ?? "-"}</div>
                   <div>Strokes {h.strokes ?? "-"}</div>
                   <div className="pill">{h.result}</div>
-                  <div className="pts">{h.points}</div>
+                  <div className="holePointsCell">
+                    <div className="pts">{h.totalPoints}</div>
+                    {h.bonusPoints > 0 ? <div className="holeBonusText">+{h.bonusPoints} bonus</div> : null}
+                  </div>
                 </div>
               ))}
               {(holeModal.holes || []).length === 0 && (

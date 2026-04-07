@@ -140,6 +140,11 @@ body {
   align-items: flex-start;
 }
 
+.rosterMain,
+.leaderboardMain {
+  min-width: 0;
+}
+
 .clickable {
   cursor: pointer;
 }
@@ -150,6 +155,8 @@ body {
 
 .clickableName {
   cursor: pointer;
+  font-weight: 700;
+  margin-top: 4px;
 }
 
 .clickableName:hover {
@@ -277,7 +284,7 @@ body {
 .modalHeader {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
 }
 
@@ -306,11 +313,21 @@ body {
 
 .holeRow {
   display: grid;
-  grid-template-columns: 70px 90px 90px 120px 1fr 60px;
+  grid-template-columns: 70px 90px 90px 120px 1fr 90px;
   gap: 10px;
   padding: 10px 6px;
   border-bottom: 1px solid var(--border);
   align-items: center;
+}
+
+.holePointsCell {
+  text-align: right;
+}
+
+.holeBonusText {
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: 2px;
 }
 
 .sectionHeader {
@@ -359,6 +376,39 @@ body {
   border-color: rgba(78,161,255,0.65);
   color: var(--text);
   background: rgba(78,161,255,0.12);
+}
+
+.scoreBreakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.scoreBreakdown span {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+}
+
+.highlightRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.highlightTag {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 196, 87, 0.12);
+  border: 1px solid rgba(255, 196, 87, 0.35);
+  color: #ffd98a;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .dashboardHero {
@@ -623,5 +673,10 @@ body {
 
   .draftBoardSlotRow {
     grid-template-columns: 1fr;
+  }
+
+  .holeRow {
+    grid-template-columns: 1fr;
+    align-items: start;
   }
 }

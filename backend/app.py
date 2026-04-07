@@ -49,6 +49,7 @@ def slugify(s: str) -> str:
         .replace("ó", "o")
         .replace("ú", "u")
         .replace("ñ", "n")
+        .replace("ø", "o")
         .replace(" ", "-")
     )
 
@@ -122,7 +123,6 @@ AMERICANS = {
 }
 
 NON_PGA_TOUR = {
-    # LIV / clearly non-PGA league players
     "bryson-dechambeau",
     "sergio-garcia",
     "tyrrell-hatton",
@@ -134,16 +134,12 @@ NON_PGA_TOUR = {
     "charl-schwartzel",
     "cameron-smith",
     "bubba-watson",
-
-    # amateurs
     "ethan-fang",
     "jackson-herrington",
     "brandon-holtz",
     "mason-howell",
     "fifa-laopakdee",
     "mateo-pulcini",
-
-    # veteran / non-PGA regular invitees
     "angel-cabrera",
     "fred-couples",
     "jose-maria-olazabal",
@@ -235,10 +231,7 @@ def serialize_room_state() -> Dict[str, Any]:
     for team in d.teams:
         roster = d.rosters.get(team, {})
         rosters_out[team] = {
-            "slots": {
-                slot: roster.get(slot)
-                for slot in ALL_SLOTS
-            },
+            "slots": {slot: roster.get(slot) for slot in ALL_SLOTS},
             "filledCount": sum(1 for slot in ALL_SLOTS if roster.get(slot) is not None),
             "requiredFilled": all(roster.get(slot) is not None for slot in STARTER_SLOTS),
         }
@@ -530,12 +523,26 @@ def tournament_leaderboard():
 def player_holes(athlete_id: str):
     sc = scorecards.get(athlete_id)
     if not sc:
-        return {"athleteId": athlete_id, "name": athlete_id.replace("-", " ").title(), "holes": [], "fantasyPoints": 0}
+        return {
+            "athleteId": athlete_id,
+            "name": athlete_id.replace("-", " ").title(),
+            "holes": [],
+            "fantasyPoints": 0,
+            "basePoints": 0,
+            "bonusPoints": 0,
+            "placementBonus": 0,
+            "scoringHighlights": [],
+        }
+
     return {
         "athleteId": sc.athlete_id,
         "name": sc.name,
         "fantasyPoints": sc.fantasy_points,
+        "basePoints": sc.hole_points,
+        "bonusPoints": sc.bonus_points,
+        "placementBonus": sc.placement_bonus,
         "madeCut": sc.made_cut,
+        "scoringHighlights": sc.scoring_highlights,
         "holes": [
             {
                 "round": h.round,
@@ -544,6 +551,8 @@ def player_holes(athlete_id: str):
                 "strokes": h.strokes,
                 "result": h.result,
                 "points": h.points,
+                "bonusPoints": h.bonus_points,
+                "totalPoints": round(h.points + h.bonus_points, 2),
             }
             for h in sc.holes
         ],
