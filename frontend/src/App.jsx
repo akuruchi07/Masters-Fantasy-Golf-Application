@@ -702,10 +702,18 @@ export default function App() {
   return (
     <div className="page">
       <header className="topbar">
-        <div>
-          <h1 className="h1">Masters Draft Room</h1>
+        <div className="topbarLeft">
+          <div className="brandRow">
+            <div className="brandBadge">⛳</div>
+            <div>
+              <h1 className="brandTitle">Masters Weekend Pool</h1>
+              <div className="brandSubtitle">Augusta National • Draft & Leaderboard</div>
+            </div>
+          </div>
+
           <div className="muted">
-            You are: <b>{me?.name || "…"}</b> {me?.isHost ? <span className="pillHost">HOST</span> : null}
+            You are: <b>{me?.name || "…"}</b>{" "}
+            {me?.isHost ? <span className="pillHost">HOST</span> : null}
             {" • "}
             {draft?.started
               ? draft.completed
@@ -713,30 +721,6 @@ export default function App() {
                 : `On the clock: ${draft.currentTeam} • Pick ${draft.pickNo}/${draft.totalPicks} • ${draft.secondsLeft}s`
               : "Draft not started"}
           </div>
-        </div>
-
-        <div className="actions">
-          <button className="btn" onClick={() => setViewMode("dashboard")}>Standings</button>
-          <button className="btn" onClick={() => setViewMode("draft")}>Draft Room</button>
-          <button className="btn" onClick={() => setViewMode("auto")}>Auto View</button>
-
-          {me?.isHost && !draft?.started && (
-            <button className="btn primary" onClick={startDraft}>Start Draft</button>
-          )}
-
-          {me?.isHost && draft?.started && !draft?.completed && (
-            <div className="timerControls">
-              <input
-                className="input timerInput"
-                type="number"
-                min="5"
-                max="300"
-                value={timerInput}
-                onChange={(e) => setTimerInput(e.target.value)}
-              />
-              <button className="btn" onClick={updateTimer}>Update Timer</button>
-            </div>
-          )}
         </div>
       </header>
 

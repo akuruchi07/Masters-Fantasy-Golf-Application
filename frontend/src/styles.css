@@ -1,11 +1,21 @@
 :root {
-  --bg: #0b0c10;
-  --card: #12141a;
-  --text: #e9edf1;
-  --muted: #aeb7c2;
-  --border: #242834;
-  --accent: #4ea1ff;
-  --danger: #ff5b5b;
+  --bg: #0d1f17;
+  --bg-alt: #133325;
+  --card: #f7f3ea;
+  --card-alt: #fffdf8;
+  --text: #163224;
+  --text-strong: #0e2218;
+  --muted: #5f6f63;
+  --border: #d8cfbe;
+  --accent: #1f6b43;
+  --accent-strong: #145233;
+  --accent-soft: #e5f2ea;
+  --gold: #d4af37;
+  --gold-soft: #f5e7b1;
+  --danger: #b42318;
+  --danger-soft: #fde7e4;
+  --white: #ffffff;
+  --shadow: 0 8px 24px rgba(7, 23, 15, 0.10);
 }
 
 * { box-sizing: border-box; }
@@ -13,8 +23,10 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  background:
+    radial-gradient(circle at top, rgba(212, 175, 55, 0.10), transparent 28%),
+    linear-gradient(180deg, #0f291d 0%, #0d1f17 100%);
+  color: var(--white);
 }
 
 .page {
@@ -23,16 +35,34 @@ body {
   padding: 18px;
 }
 
-.h1 { margin: 0; font-size: 26px; }
-.h2 { margin: 0; font-size: 18px; }
-.muted { color: var(--muted); margin-top: 6px; }
+.h1 {
+  margin: 0;
+  font-size: 28px;
+  color: var(--white);
+}
+
+.h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text-strong);
+}
+
+.muted {
+  color: rgba(255, 255, 255, 0.78);
+  margin-top: 6px;
+}
 
 .topbar {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  background: linear-gradient(135deg, rgba(20, 82, 51, 0.92), rgba(31, 107, 67, 0.86));
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
 }
 
 .actions {
@@ -64,41 +94,54 @@ body {
 }
 
 .card {
-  background: var(--card);
+  background: linear-gradient(180deg, var(--card-alt) 0%, var(--card) 100%);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 12px;
+  border-radius: 18px;
+  padding: 14px;
+  color: var(--text);
+  box-shadow: var(--shadow);
 }
 
 .btn {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border);
-  padding: 10px 12px;
-  border-radius: 10px;
+  background: var(--white);
+  color: var(--accent-strong);
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  padding: 10px 14px;
+  border-radius: 999px;
   cursor: pointer;
+  font-weight: 700;
+  transition: 0.18s ease;
 }
 
 .btn:hover {
-  border-color: var(--accent);
+  border-color: var(--gold);
+  transform: translateY(-1px);
 }
 
 .btn.primary {
-  border-color: rgba(78,161,255,0.55);
+  background: linear-gradient(180deg, var(--gold-soft) 0%, #ebd98d 100%);
+  color: #3c2c00;
+  border-color: rgba(138, 104, 8, 0.28);
 }
 
 .btn.primary:hover {
-  border-color: rgba(78,161,255,1);
+  background: linear-gradient(180deg, #f1df94 0%, #e3cc72 100%);
 }
 
 .input {
   width: 100%;
   margin-top: 10px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--border);
-  background: #0f1116;
-  color: var(--text);
+  background: var(--white);
+  color: var(--text-strong);
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(31, 107, 67, 0.55);
+  box-shadow: 0 0 0 3px rgba(31, 107, 67, 0.10);
 }
 
 .timerControls {
@@ -132,7 +175,7 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  padding: 10px 6px;
+  padding: 12px 8px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -147,16 +190,19 @@ body {
 
 .clickable {
   cursor: pointer;
+  transition: 0.15s ease;
 }
 
 .clickable:hover {
-  background: rgba(78,161,255,0.08);
+  background: rgba(31, 107, 67, 0.06);
+  border-radius: 10px;
 }
 
 .clickableName {
   cursor: pointer;
   font-weight: 700;
   margin-top: 4px;
+  color: var(--accent-strong);
 }
 
 .clickableName:hover {
@@ -165,6 +211,7 @@ body {
 
 .name {
   font-weight: 800;
+  color: var(--text-strong);
 }
 
 .meta {
@@ -175,24 +222,28 @@ body {
 .pts {
   font-weight: 900;
   font-size: 16px;
+  color: var(--accent-strong);
 }
 
 .pill {
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  color: var(--muted);
+  border: 1px solid rgba(31, 107, 67, 0.18);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
   font-size: 12px;
+  font-weight: 700;
 }
 
 .pillHost {
   margin-left: 8px;
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(78,161,255,0.55);
-  color: rgba(78,161,255,1);
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  background: rgba(212, 175, 55, 0.16);
+  color: #7a5d00;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .teams {
@@ -230,15 +281,16 @@ body {
 
 .pick {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 10px;
   display: flex;
   gap: 10px;
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .pickNo {
   font-weight: 900;
-  color: var(--accent);
+  color: var(--gold);
 }
 
 .pickName {
@@ -252,29 +304,32 @@ body {
 
 .error {
   padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 91, 91, 0.35);
-  background: rgba(255, 91, 91, 0.10);
-  color: #ffd2d2;
+  border-radius: 14px;
+  border: 1px solid rgba(180, 35, 24, 0.18);
+  background: var(--danger-soft);
+  color: var(--danger);
   margin-top: 10px;
 }
 
 .modalBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.6);
+  background: rgba(7, 20, 14, 0.62);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 18px;
+  z-index: 50;
 }
 
 .modal {
   width: min(920px, 100%);
-  background: var(--card);
+  background: linear-gradient(180deg, var(--card-alt) 0%, var(--card) 100%);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 12px;
+  border-radius: 18px;
+  padding: 14px;
+  color: var(--text);
+  box-shadow: 0 20px 50px rgba(6, 18, 12, 0.28);
 }
 
 .smallModal {
@@ -291,6 +346,7 @@ body {
 .modalTitle {
   font-weight: 900;
   font-size: 18px;
+  color: var(--text-strong);
 }
 
 .slotChoices {
@@ -326,8 +382,9 @@ body {
 
 .holeBonusText {
   font-size: 11px;
-  color: var(--accent);
+  color: var(--gold);
   margin-top: 2px;
+  font-weight: 700;
 }
 
 .sectionHeader {
@@ -348,9 +405,9 @@ body {
 .categoryTag {
   padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(78, 161, 255, 0.35);
-  background: rgba(78, 161, 255, 0.12);
-  color: #cfe4ff;
+  border: 1px solid rgba(31, 107, 67, 0.20);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
   font-size: 11px;
   font-weight: 700;
 }
@@ -366,16 +423,17 @@ body {
   padding: 8px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: transparent;
+  background: var(--white);
   color: var(--muted);
   font-size: 12px;
   cursor: pointer;
+  font-weight: 700;
 }
 
 .filterChip.active {
-  border-color: rgba(78,161,255,0.65);
-  color: var(--text);
-  background: rgba(78,161,255,0.12);
+  border-color: rgba(31, 107, 67, 0.4);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
 }
 
 .scoreBreakdown {
@@ -388,16 +446,16 @@ body {
 .scoreChipButton {
   padding: 3px 8px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--border);
-  color: var(--muted);
+  background: rgba(31, 107, 67, 0.07);
+  border: 1px solid rgba(31, 107, 67, 0.14);
+  color: var(--accent-strong);
   font-size: 11px;
   cursor: pointer;
+  font-weight: 700;
 }
 
 .scoreChipButton:hover {
-  border-color: var(--accent);
-  color: var(--text);
+  border-color: var(--gold);
 }
 
 .highlightRow {
@@ -410,11 +468,11 @@ body {
 .highlightTag {
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(255, 196, 87, 0.12);
-  border: 1px solid rgba(255, 196, 87, 0.35);
-  color: #ffd98a;
+  background: rgba(212, 175, 55, 0.14);
+  border: 1px solid rgba(212, 175, 55, 0.32);
+  color: #7a5d00;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .breakdownSection {
@@ -425,18 +483,20 @@ body {
 
 .breakdownTotal {
   font-size: 14px;
+  color: var(--text);
 }
 
 .breakdownCard {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 12px;
-  background: #0f1116;
+  background: rgba(255, 255, 255, 0.58);
 }
 
 .breakdownCardTitle {
   font-weight: 800;
   margin-bottom: 8px;
+  color: var(--text-strong);
 }
 
 .breakdownRounds {
@@ -490,7 +550,7 @@ body {
 }
 
 .dashboardHeroCard {
-  padding: 16px;
+  padding: 18px;
 }
 
 .dashboardHeroHeader {
@@ -502,7 +562,7 @@ body {
 }
 
 .dashboardEyebrow {
-  color: var(--accent);
+  color: var(--gold);
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
@@ -511,7 +571,8 @@ body {
 
 .dashboardTitle {
   margin: 4px 0 0 0;
-  font-size: 28px;
+  font-size: 30px;
+  color: var(--text-strong);
 }
 
 .standingsTable {
@@ -526,19 +587,20 @@ body {
   align-items: center;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 14px;
-  background: rgba(255,255,255,0.02);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.76), rgba(246,240,227,0.9));
 }
 
 .standingsRank {
   font-size: 22px;
   font-weight: 900;
-  color: var(--accent);
+  color: var(--gold);
 }
 
 .standingsTeamName {
   font-size: 16px;
   font-weight: 800;
+  color: var(--text-strong);
 }
 
 .standingsTeamMeta {
@@ -551,6 +613,7 @@ body {
   justify-self: end;
   font-size: 24px;
   font-weight: 900;
+  color: var(--accent);
 }
 
 .teamRosterGrid {
@@ -562,9 +625,9 @@ body {
 
 .teamRosterCard {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 12px;
-  background: rgba(255,255,255,0.02);
+  background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(247,243,234,0.96));
 }
 
 .teamRosterHeader {
@@ -578,6 +641,7 @@ body {
 .teamRosterName {
   font-size: 17px;
   font-weight: 800;
+  color: var(--text-strong);
 }
 
 .teamRosterSubtext {
@@ -601,7 +665,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 10px;
-  background: #0f1116;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .teamRosterSlotTop {
@@ -627,6 +691,7 @@ body {
   font-size: 15px;
   font-weight: 800;
   margin-top: 4px;
+  color: var(--text-strong);
 }
 
 .teamRosterPlayerMeta {
@@ -644,9 +709,9 @@ body {
 
 .draftBoardCard {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 12px;
-  background: rgba(255,255,255,0.02);
+  background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(247,243,234,0.96));
 }
 
 .draftBoardHeader {
@@ -659,6 +724,7 @@ body {
 .draftBoardName {
   font-size: 16px;
   font-weight: 800;
+  color: var(--text-strong);
 }
 
 .draftBoardMeta {
@@ -672,9 +738,9 @@ body {
   margin-left: 8px;
   padding: 3px 8px;
   border-radius: 999px;
-  background: rgba(78,161,255,0.14);
-  border: 1px solid rgba(78,161,255,0.45);
-  color: #cfe4ff;
+  background: rgba(31, 107, 67, 0.12);
+  border: 1px solid rgba(31, 107, 67, 0.28);
+  color: var(--accent-strong);
   font-size: 11px;
   font-weight: 800;
 }
@@ -692,7 +758,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 10px;
-  background: #0f1116;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .draftBoardSlotLabel {
@@ -704,6 +770,7 @@ body {
 .draftBoardSlotPlayer {
   font-size: 13px;
   font-weight: 700;
+  color: var(--text-strong);
 }
 
 .draftBoardSlotEmpty {
@@ -752,5 +819,69 @@ body {
   .holeRow {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+
+  .topbar {
+    padding: 14px;
+  }
+
+  .topbarLeft {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .brandRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brandBadge {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, #1f6b43, #145233);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: #f5e7b1;
+    border: 1px solid rgba(212, 175, 55, 0.6);
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+  }
+
+  .brandTitle {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 0.3px;
+    color: #ffffff;
+  }
+
+  .brandSubtitle {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.75);
+    margin-top: 2px;
+  }
+
+  /* Gold divider under topbar */
+  .topbar {
+    position: relative;
+  }
+
+  .topbar::after {
+    content: "";
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: -8px;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(212, 175, 55, 0.8),
+      transparent
+    );
   }
 }
