@@ -31,6 +31,7 @@ function getCategoryTags(player) {
   if (player?.isInternational) tags.push("International");
   if (player?.isAmerican) tags.push("American");
   if (player?.isNonPga) tags.push("Non-PGA");
+  tags.push("Wildcard");
   return tags;
 }
 
@@ -848,7 +849,7 @@ export default function App() {
 
             <div className="needStrip">
               {myNeededStarterSlots.length ? (
-                <span>Fill required categories before backups</span>
+                <span>Still need: {myNeededStarterSlots.map((slot) => slotLabels[slot] || slot).join(", ")}</span>
               ) : (
                 <span className="needStripDone">All starter categories filled. Backups unlocked.</span>
               )}
