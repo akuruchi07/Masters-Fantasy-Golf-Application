@@ -39,6 +39,7 @@ body {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .layout {
@@ -51,6 +52,13 @@ body {
 .threeCol {
   display: grid;
   grid-template-columns: 420px 360px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.draftLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.8fr);
   gap: 16px;
   align-items: start;
 }
@@ -310,6 +318,7 @@ body {
   justify-content: space-between;
   align-items: baseline;
   margin-top: 12px;
+  gap: 10px;
 }
 
 .tagRow {
@@ -329,19 +338,290 @@ body {
   font-weight: 700;
 }
 
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.filterChip {
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.filterChip.active {
+  border-color: rgba(78,161,255,0.65);
+  color: var(--text);
+  background: rgba(78,161,255,0.12);
+}
+
+.dashboardHero {
+  margin-bottom: 16px;
+}
+
+.dashboardHeroCard {
+  padding: 16px;
+}
+
+.dashboardHeroHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dashboardEyebrow {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.dashboardTitle {
+  margin: 4px 0 0 0;
+  font-size: 28px;
+}
+
+.standingsTable {
+  display: grid;
+  gap: 8px;
+}
+
+.standingsRow {
+  display: grid;
+  grid-template-columns: 72px 1fr 120px;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.02);
+}
+
+.standingsRank {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--accent);
+}
+
+.standingsTeamName {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.standingsTeamMeta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.standingsScore {
+  justify-self: end;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.teamRosterGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.teamRosterCard {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255,255,255,0.02);
+}
+
+.teamRosterHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.teamRosterName {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.teamRosterSubtext {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.teamRosterTotal {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--accent);
+}
+
+.teamRosterSlots {
+  display: grid;
+  gap: 8px;
+}
+
+.teamRosterSlot {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: #0f1116;
+}
+
+.teamRosterSlotTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.teamRosterSlotLabel {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.teamRosterSlotPoints {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--accent);
+}
+
+.teamRosterPlayerName {
+  font-size: 15px;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+.teamRosterPlayerMeta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.draftBoardGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.draftBoardCard {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255,255,255,0.02);
+}
+
+.draftBoardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.draftBoardName {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.draftBoardMeta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.draftingNowPill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(78,161,255,0.14);
+  border: 1px solid rgba(78,161,255,0.45);
+  color: #cfe4ff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.draftBoardSlots {
+  display: grid;
+  gap: 6px;
+}
+
+.draftBoardSlotRow {
+  display: grid;
+  grid-template-columns: 145px 1fr;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #0f1116;
+}
+
+.draftBoardSlotLabel {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.draftBoardSlotPlayer {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.draftBoardSlotEmpty {
+  color: var(--muted);
+}
+
+.missingCategoryText {
+  color: var(--danger) !important;
+  font-weight: 800;
+}
+
 @media (max-width: 1180px) {
   .layout,
-  .threeCol {
+  .threeCol,
+  .draftLayout {
     grid-template-columns: 1fr;
   }
 
   .picks {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .teamRosterGrid,
+  .draftBoardGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 700px) {
   .picks {
+    grid-template-columns: 1fr;
+  }
+
+  .standingsRow {
+    grid-template-columns: 56px 1fr 88px;
+  }
+
+  .dashboardTitle {
+    font-size: 22px;
+  }
+
+  .draftBoardSlotRow {
     grid-template-columns: 1fr;
   }
 }

@@ -31,8 +31,16 @@ function getCategoryTags(player) {
   if (player.isInternational) tags.push("International");
   if (player.isAmerican) tags.push("American");
   if (player.isNonPga) tags.push("Non-PGA");
-  tags.push("Wildcard");
   return tags;
+}
+
+function playerMatchesFilter(player, filter) {
+  if (filter === "all") return true;
+  if (filter === "past_champion") return !!player.isPastChampion;
+  if (filter === "international") return !!player.isInternational;
+  if (filter === "american") return !!player.isAmerican;
+  if (filter === "non_pga") return !!player.isNonPga;
+  return true;
 }
 
 export default function App() {
@@ -45,12 +53,13 @@ export default function App() {
   const [scoreboard, setScoreboard] = useState(null);
 
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [holeModal, setHoleModal] = useState(null);
   const [slotModal, setSlotModal] = useState(null);
   const [error, setError] = useState("");
   const [tournamentLeaderboard, setTournamentLeaderboard] = useState([]);
   const [timerInput, setTimerInput] = useState(60);
-  const [viewMode, setViewMode] = useState("auto"); // auto | dashboard | draft
+  const [viewMode, setViewMode] = useState("auto");
 
   const draft = room?.draft;
 
@@ -119,8 +128,9 @@ export default function App() {
     const q = query.trim().toLowerCase();
     return (field || [])
       .filter((p) => !picked.has(p.athleteId))
+      .filter((p) => playerMatchesFilter(p, categoryFilter))
       .filter((p) => (q ? p.name.toLowerCase().includes(q) : true));
-  }, [field, picked, query]);
+  }, [field, picked, query, categoryFilter]);
 
   const leagueStandings = useMemo(() => {
     if (!scoreboard?.teams) return [];
@@ -133,6 +143,16 @@ export default function App() {
       }))
       .sort((a, b) => b.total - a.total);
   }, [scoreboard]);
+
+  const draftTeams = useMemo(() => {
+    if (!draft?.rosters) return [];
+    return Object.entries(draft.rosters).map(([teamName, rosterData]) => ({
+      teamName,
+      slots: rosterData.slots || {},
+      filledCount: rosterData.filledCount || 0,
+      requiredFilled: !!rosterData.requiredFilled,
+    }));
+  }, [draft]);
 
   const onClock = draft?.currentTeam;
   const isMyTurn = !!me && draft?.started && !draft?.completed && onClock === me.name;
@@ -224,22 +244,27 @@ export default function App() {
   }
 
   function renderMyTeamCard() {
+    const starterSlots = new Set(draft?.starterSlots || []);
+
     return (
       <section className="card rosterCard">
         <div className="teamHeader">
-          <h2 className="h2">My Team</h2>
+          <h2 className="h2">My Current Team</h2>
           <div className="total">Total: {myTeam?.total ?? 0}</div>
         </div>
         <div className="list rosterList">
           {Object.entries(slotLabels).map(([slot, label]) => {
             const player = myRoster?.[slot];
             const scoreRow = (myTeam?.players || []).find((p) => p.slot === slot);
-            const isStarter = (draft?.starterSlots || []).includes(slot);
+            const isStarter = starterSlots.has(slot);
+            const showMissingRequired = isStarter && !player;
 
             return (
               <div className="row rosterRow" key={slot}>
                 <div>
-                  <div className="name">{label}</div>
+                  <div className={`name ${showMissingRequired ? "missingCategoryText" : ""}`}>
+                    {label}
+                  </div>
                   {player ? (
                     <>
                       <div className="clickableName" onClick={() => openHoles(player.athleteId, player.name)}>
@@ -259,7 +284,9 @@ export default function App() {
                       </div>
                     </>
                   ) : (
-                    <div className="meta">Empty</div>
+                    <div className={`meta ${showMissingRequired ? "missingCategoryText" : ""}`}>
+                      {isStarter ? "Required category not filled yet" : "Empty"}
+                    </div>
                   )}
                 </div>
                 <div className="pts">{scoreRow?.fantasyPoints ?? 0}</div>
@@ -271,35 +298,125 @@ export default function App() {
     );
   }
 
+  function renderTeamRosterCard(team) {
+    return (
+      <div className="teamRosterCard" key={team.teamName}>
+        <div className="teamRosterHeader">
+          <div>
+            <div className="teamRosterName">{team.teamName}</div>
+            <div className="teamRosterSubtext">
+              {team.missedStarterSlots.length > 0
+                ? `Missed cut slots: ${team.missedStarterSlots.length}`
+                : "All tracked slots active"}
+            </div>
+          </div>
+          <div className="teamRosterTotal">{team.total}</div>
+        </div>
+
+        <div className="teamRosterSlots">
+          {team.players.map((p) => (
+            <div className="teamRosterSlot" key={`${team.teamName}-${p.slot}`}>
+              <div className="teamRosterSlotTop">
+                <span className="teamRosterSlotLabel">{p.slotLabel}</span>
+                <span className="teamRosterSlotPoints">{p.fantasyPoints ?? 0}</span>
+              </div>
+              <div className="teamRosterPlayerName">{p.name || "Empty"}</div>
+              <div className="teamRosterPlayerMeta">
+                {p.name
+                  ? p.status === "missed_cut"
+                    ? "Missed cut"
+                    : p.status === "active_backup"
+                    ? "Active backup"
+                    : p.status === "bench"
+                    ? "Bench"
+                    : "Scoring"
+                  : "No player assigned"}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function renderDraftBoardCard() {
+    return (
+      <section className="card">
+        <div className="sectionHeader">
+          <h2 className="h2">Draft Board</h2>
+          <div className="pill">{draftTeams.length} teams</div>
+        </div>
+
+        <div className="draftBoardGrid">
+          {draftTeams.map((team) => (
+            <div className="draftBoardCard" key={team.teamName}>
+              <div className="draftBoardHeader">
+                <div>
+                  <div className="draftBoardName">
+                    {team.teamName}
+                    {draft?.currentTeam === team.teamName && !draft?.completed ? (
+                      <span className="draftingNowPill">On clock</span>
+                    ) : null}
+                  </div>
+                  <div className="draftBoardMeta">{team.filledCount}/7 drafted</div>
+                </div>
+              </div>
+
+              <div className="draftBoardSlots">
+                {Object.entries(slotLabels).map(([slot, label]) => {
+                  const player = team.slots?.[slot];
+                  return (
+                    <div className="draftBoardSlotRow" key={`${team.teamName}-${slot}`}>
+                      <div className="draftBoardSlotLabel">{label}</div>
+                      <div className={`draftBoardSlotPlayer ${!player ? "draftBoardSlotEmpty" : ""}`}>
+                        {player?.name || "—"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {draftTeams.length === 0 && <div className="empty">No draft teams available.</div>}
+        </div>
+      </section>
+    );
+  }
+
   function renderDashboardView() {
     return (
       <>
-        <div className="layout threeCol">
-          <section className="card">
-            <div className="sectionHeader">
-              <h2 className="h2">League Standings</h2>
-              <div className="pill">{draft?.completed ? "Final rosters locked" : draft?.started ? "Draft in progress" : "Pre-draft"}</div>
+        <div className="dashboardHero">
+          <div className="card dashboardHeroCard">
+            <div className="dashboardHeroHeader">
+              <div>
+                <div className="dashboardEyebrow">League Overview</div>
+                <h2 className="dashboardTitle">League Standings</h2>
+              </div>
+              <div className="pill">
+                {draft?.completed ? "Final rosters locked" : draft?.started ? "Draft in progress" : "Pre-draft"}
+              </div>
             </div>
 
-            <div className="list">
+            <div className="standingsTable">
               {leagueStandings.map((team, idx) => (
-                <div className="row" key={team.teamName}>
-                  <div>
-                    <div className="name">#{idx + 1} {team.teamName}</div>
-                    <div className="meta">
-                      {team.players
-                        .filter((p) => p.name)
-                        .map((p) => `${p.slotLabel}: ${p.name}`)
-                        .join(" • ")}
+                <div className="standingsRow" key={team.teamName}>
+                  <div className="standingsRank">#{idx + 1}</div>
+                  <div className="standingsTeamBlock">
+                    <div className="standingsTeamName">{team.teamName}</div>
+                    <div className="standingsTeamMeta">
+                      {team.players.filter((p) => p.name).length} / 7 roster spots filled
                     </div>
                   </div>
-                  <div className="pts">{team.total}</div>
+                  <div className="standingsScore">{team.total}</div>
                 </div>
               ))}
               {leagueStandings.length === 0 && <div className="empty">No standings yet.</div>}
             </div>
-          </section>
+          </div>
+        </div>
 
+        <div className="layout threeCol">
           {renderMyTeamCard()}
 
           <section className="card">
@@ -317,31 +434,29 @@ export default function App() {
               {tournamentLeaderboard.length === 0 && <div className="empty">Leaderboard unavailable.</div>}
             </div>
           </section>
+
+          <section className="card">
+            <h2 className="h2">Lobby / Draft Status</h2>
+            <div className="list lobbyList">
+              {(room?.users || []).map((u) => (
+                <div className="row" key={u.userId}>
+                  <div className="name">
+                    {u.name} {u.isHost ? <span className="pillHost">HOST</span> : null}
+                  </div>
+                </div>
+              ))}
+              {(room?.users || []).length === 0 && <div className="empty">No users joined.</div>}
+            </div>
+          </section>
         </div>
 
         <section className="card picksCard">
-          <h2 className="h2">All Team Rosters</h2>
-          <div className="picks">
-            {leagueStandings.map((team) => (
-              <div className="pick" key={team.teamName} style={{ display: "block" }}>
-                <div className="pickName" style={{ marginBottom: 8 }}>{team.teamName}</div>
-                <div className="pickMeta" style={{ marginBottom: 8 }}>Total: {team.total}</div>
-                <div style={{ display: "grid", gap: 8 }}>
-                  {team.players.map((p) => (
-                    <div key={`${team.teamName}-${p.slot}`} style={{ borderTop: "1px solid var(--border)", paddingTop: 8 }}>
-                      <div className="name" style={{ fontSize: 13 }}>{p.slotLabel}</div>
-                      <div className="meta">
-                        {p.name || "Empty"}
-                        {p.name ? ` • ${p.fantasyPoints ?? 0} pts` : ""}
-                        {p.status === "missed_cut" ? " • Missed cut" : ""}
-                        {p.status === "active_backup" ? " • Active backup" : ""}
-                        {p.status === "bench" ? " • Bench" : ""}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+          <div className="sectionHeader">
+            <h2 className="h2">Team Rosters</h2>
+            <div className="pill">{leagueStandings.length} teams</div>
+          </div>
+          <div className="teamRosterGrid">
+            {leagueStandings.map((team) => renderTeamRosterCard(team))}
             {leagueStandings.length === 0 && <div className="empty">No teams yet.</div>}
           </div>
         </section>
@@ -352,26 +467,52 @@ export default function App() {
   function renderDraftView() {
     return (
       <>
-        <div className="layout threeCol">
+        <div className="draftLayout">
           <section className="card">
-            <h2 className="h2">Players in Lobby</h2>
-            <div className="list lobbyList">
-              {(room?.users || []).map((u) => (
-                <div className="row" key={u.userId}>
-                  <div className="name">
-                    {u.name} {u.isHost ? <span className="pillHost">HOST</span> : null}
-                  </div>
-                </div>
-              ))}
-              {(room?.users || []).length === 0 && <div className="empty">No one yet.</div>}
-            </div>
-
             <div className="sectionHeader">
-              <h2 className="h2">Available (Top 50)</h2>
+              <h2 className="h2">Available Players</h2>
               <div className="pill">{draft?.started ? (isMyTurn ? "Your turn" : `Waiting: ${onClock}`) : "Waiting for host"}</div>
             </div>
 
-            <input className="input" placeholder="Search..." value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input
+              className="input"
+              placeholder="Search..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+
+            <div className="filterRow">
+              <button
+                className={`filterChip ${categoryFilter === "all" ? "active" : ""}`}
+                onClick={() => setCategoryFilter("all")}
+              >
+                All
+              </button>
+              <button
+                className={`filterChip ${categoryFilter === "past_champion" ? "active" : ""}`}
+                onClick={() => setCategoryFilter("past_champion")}
+              >
+                Past Champion
+              </button>
+              <button
+                className={`filterChip ${categoryFilter === "international" ? "active" : ""}`}
+                onClick={() => setCategoryFilter("international")}
+              >
+                International
+              </button>
+              <button
+                className={`filterChip ${categoryFilter === "american" ? "active" : ""}`}
+                onClick={() => setCategoryFilter("american")}
+              >
+                American
+              </button>
+              <button
+                className={`filterChip ${categoryFilter === "non_pga" ? "active" : ""}`}
+                onClick={() => setCategoryFilter("non_pga")}
+              >
+                Non-PGA
+              </button>
+            </div>
 
             <div className="list">
               {available.map((p) => (
@@ -399,60 +540,9 @@ export default function App() {
           </section>
 
           {renderMyTeamCard()}
-
-          <section className="teams">
-            <div className="card">
-              <h2>League Standings</h2>
-              <div className="list">
-                {leagueStandings.map((team, idx) => (
-                  <div className="row" key={team.teamName}>
-                    <div>
-                      <div className="name">#{idx + 1} {team.teamName}</div>
-                      <div className="meta">
-                        {team.players
-                          .filter((p) => p.name)
-                          .map((p) => `${p.slotLabel}: ${p.name}`)
-                          .join(" • ")}
-                      </div>
-                    </div>
-                    <div className="pts">{team.total}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="card">
-              <h2>Tournament Leaderboard</h2>
-              <div className="list">
-                {tournamentLeaderboard.slice(0, 25).map((player, idx) => (
-                  <div className="row" key={`${player.golfer_name}-${idx}`}>
-                    <div>
-                      <div className="name">#{idx + 1} {player.golfer_name}</div>
-                      <div className="meta">Base: {player.base_points} • Bonus: {player.bonus_points}</div>
-                    </div>
-                    <div className="pts">{player.fantasy_points}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
         </div>
 
-        <section className="card picksCard">
-          <h2 className="h2">Pick History</h2>
-          <div className="picks">
-            {(draft?.picks || []).map((p) => (
-              <div className="pick" key={`${p.pickNo}-${p.athleteId}`}>
-                <div className="pickNo">#{p.pickNo}</div>
-                <div className="pickBody">
-                  <div className="pickName">{p.name}</div>
-                  <div className="pickMeta">{p.team} • {p.slotLabel}</div>
-                </div>
-              </div>
-            ))}
-            {(draft?.picks || []).length === 0 && <div className="empty">No picks yet.</div>}
-          </div>
-        </section>
+        {renderDraftBoardCard()}
       </>
     );
   }
