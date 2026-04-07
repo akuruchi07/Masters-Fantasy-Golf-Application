@@ -31,6 +31,7 @@ function getCategoryTags(player) {
   if (player?.isInternational) tags.push("International");
   if (player?.isAmerican) tags.push("American");
   if (player?.isNonPga) tags.push("Non-PGA");
+  tags.push("Wildcard");
   return tags;
 }
 
@@ -119,6 +120,37 @@ function aggregateNestedBreakdown(nested) {
   return aggregated;
 }
 
+function buildSnakeBoard(teams, picks, snake) {
+  if (!Array.isArray(teams) || teams.length === 0) return [];
+  const totalRounds = 7;
+  const board = [];
+
+  for (let round = 1; round <= totalRounds; round++) {
+    const roundOrder = snake && round % 2 === 0 ? [...teams].reverse() : [...teams];
+    const startPick = (round - 1) * teams.length + 1;
+    const endPick = round * teams.length;
+
+    const roundPicks = (Array.isArray(picks) ? picks : []).filter(
+      (p) => p.pickNo >= startPick && p.pickNo <= endPick
+    );
+
+    const picksByTeam = {};
+    roundPicks.forEach((p) => {
+      picksByTeam[p.team] = p;
+    });
+
+    board.push({
+      round,
+      order: roundOrder.map((team) => ({
+        team,
+        pick: picksByTeam[team] || null,
+      })),
+    });
+  }
+
+  return board;
+}
+
 export default function App() {
   const userId = useMemo(() => getOrCreateUserId(), []);
   const [name, setName] = useState(localStorage.getItem("masters_name") || "");
@@ -137,6 +169,7 @@ export default function App() {
   const [tournamentLeaderboard, setTournamentLeaderboard] = useState([]);
   const [timerInput, setTimerInput] = useState(60);
   const [viewMode, setViewMode] = useState("auto");
+  const [autoPicking, setAutoPicking] = useState(false);
 
   const draft = room?.draft;
 
@@ -153,7 +186,7 @@ export default function App() {
 
     (async () => {
       try {
-        const f = await api.field(50);
+        const f = await api.field(0);
         setField(Array.isArray(f?.players) ? f.players : []);
         const s = await api.state();
         setRoom(s);
@@ -221,18 +254,13 @@ export default function App() {
       .sort((a, b) => b.total - a.total);
   }, [scoreboard]);
 
-  const draftTeams = useMemo(() => {
-    const rosters = safeObject(draft?.rosters);
-    return Object.entries(rosters).map(([teamName, rosterData]) => ({
-      teamName,
-      slots: safeObject(rosterData?.slots),
-      filledCount: rosterData?.filledCount || 0,
-      requiredFilled: !!rosterData?.requiredFilled,
-    }));
-  }, [draft]);
-
   const onClock = draft?.currentTeam;
   const isMyTurn = !!me && draft?.started && !draft?.completed && onClock === me.name;
+
+  const snakeBoard = useMemo(
+    () => buildSnakeBoard(draft?.teams || [], draft?.picks || [], !!draft?.snake),
+    [draft]
+  );
 
   const autoView = draft?.started && !draft?.completed ? "draft" : "dashboard";
   const activeView = viewMode === "auto" ? autoView : viewMode;
@@ -277,6 +305,18 @@ export default function App() {
       await api.updateTimer(userId, Number(timerInput));
     } catch (e) {
       setError(e.message);
+    }
+  }
+
+  async function triggerAutoPick() {
+    setError("");
+    setAutoPicking(true);
+    try {
+      await api.autoPick(userId);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setAutoPicking(false);
     }
   }
 
@@ -339,19 +379,21 @@ export default function App() {
             const scoreRow = (Array.isArray(myTeam?.players) ? myTeam.players : []).find((p) => p.slot === slot);
             const isStarter = starterSlots.has(slot);
             const showMissingRequired = isStarter && !player;
+            const missedCut = scoreRow?.status === "missed_cut";
 
             return (
               <div className="row rosterRow" key={slot}>
                 <div className="rosterMain">
-                  <div className={`name ${showMissingRequired ? "missingCategoryText" : ""}`}>
-                    {label}
-                  </div>
+                  <div className={`name ${showMissingRequired ? "missingCategoryText" : ""}`}>{label}</div>
                   {player ? (
                     <>
-                      <div className="clickableName" onClick={() => openHoles(player.athleteId, player.name)}>
+                      <div
+                        className={`clickableName ${missedCut ? "missedCutName" : ""}`}
+                        onClick={() => openHoles(player.athleteId, player.name)}
+                      >
                         {player.name}
                       </div>
-                      <div className="meta">
+                      <div className={`meta ${missedCut ? "missedCutText" : ""}`}>
                         {scoreRow?.status === "missed_cut"
                           ? "Missed cut"
                           : scoreRow?.status === "active_backup"
@@ -393,7 +435,7 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <div className="pts">{scoreRow?.fantasyPoints ?? 0}</div>
+                <div className={`pts ${missedCut ? "missedCutText" : ""}`}>{scoreRow?.fantasyPoints ?? 0}</div>
               </div>
             );
           })}
@@ -402,119 +444,46 @@ export default function App() {
     );
   }
 
-  function renderTeamRosterCard(team) {
+  function renderSnakeDraftBoard() {
     return (
-      <div className="teamRosterCard" key={team.teamName}>
-        <div className="teamRosterHeader">
-          <div>
-            <div className="teamRosterName">{team.teamName}</div>
-            <div className="teamRosterSubtext">
-              {team.missedStarterSlots.length > 0
-                ? `Missed cut slots: ${team.missedStarterSlots.length}`
-                : "All tracked slots active"}
-            </div>
-          </div>
-          <div className="teamRosterTotal">{team.total}</div>
-        </div>
-
-        <div className="teamRosterSlots">
-          {team.players.map((p) => (
-            <div className="teamRosterSlot" key={`${team.teamName}-${p.slot}`}>
-              <div className="teamRosterSlotTop">
-                <span className="teamRosterSlotLabel">{p.slotLabel}</span>
-                <span className="teamRosterSlotPoints">{p.fantasyPoints ?? 0}</span>
-              </div>
-              <div className="teamRosterPlayerName">{p.name || "Empty"}</div>
-              <div className="teamRosterPlayerMeta">
-                {p.name
-                  ? p.status === "missed_cut"
-                    ? "Missed cut"
-                    : p.status === "active_backup"
-                    ? "Active backup"
-                    : p.status === "bench"
-                    ? "Bench"
-                    : "Scoring"
-                  : "No player assigned"}
-              </div>
-              {p.name ? (
-                <>
-                  <ScoreBreakdown
-                    basePoints={p.basePoints}
-                    bonusPoints={p.bonusPoints}
-                    placementBonus={p.placementBonus}
-                    onOpenBreakdown={(kind) =>
-                      openScoreBreakdownModal({
-                        playerName: p.name,
-                        teamName: team.teamName,
-                        slotLabel: p.slotLabel,
-                        kind,
-                        basePoints: p.basePoints ?? 0,
-                        bonusPoints: p.bonusPoints ?? 0,
-                        placementBonus: p.placementBonus ?? 0,
-                        roundPoints: p.roundPoints ?? {},
-                        highlights: p.scoringHighlights ?? [],
-                        totalPoints: p.fantasyPoints ?? 0,
-                        baseBreakdown: p.baseBreakdown ?? {},
-                        bonusBreakdown: p.bonusBreakdown ?? {},
-                        placementBreakdown: p.placementBreakdown ?? {},
-                      })
-                    }
-                  />
-                  <HighlightsRow highlights={p.scoringHighlights} />
-                </>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  function renderDraftBoardCard() {
-    return (
-      <section className="card">
+      <section className="card picksCard">
         <div className="sectionHeader">
-          <h2 className="h2">Draft Board</h2>
-          <div className="pill">{draftTeams.length} teams</div>
+          <h2 className="h2">Snake Draft Board</h2>
+          <div className="pill">{(draft?.teams || []).length} teams</div>
         </div>
 
-        <div className="draftBoardGrid">
-          {draftTeams.map((team) => (
-            <div className="draftBoardCard" key={team.teamName}>
-              <div className="draftBoardHeader">
-                <div>
-                  <div className="draftBoardName">
-                    {team.teamName}
-                    {draft?.currentTeam === team.teamName && !draft?.completed ? (
-                      <span className="draftingNowPill">On clock</span>
-                    ) : null}
-                  </div>
-                  <div className="draftBoardMeta">{team.filledCount}/7 drafted</div>
-                </div>
-              </div>
-
-              <div className="draftBoardSlots">
-                {Object.entries(slotLabels).map(([slot, label]) => {
-                  const player = team.slots?.[slot];
-                  return (
-                    <div className="draftBoardSlotRow" key={`${team.teamName}-${slot}`}>
-                      <div className="draftBoardSlotLabel">{label}</div>
-                      <div className={`draftBoardSlotPlayer ${!player ? "draftBoardSlotEmpty" : ""}`}>
-                        {player?.name || "—"}
-                      </div>
+        <div className="snakeBoard">
+          {snakeBoard.map((row) => (
+            <div key={row.round} className="snakeRound">
+              <div className="snakeRoundLabel">Round {row.round}</div>
+              <div className="snakeRoundPicks">
+                {row.order.map(({ team, pick }, idx) => (
+                  <div
+                    key={`${row.round}-${team}-${idx}`}
+                    className={`snakeCell ${draft?.currentTeam === team && !draft?.completed ? "snakeCellOnClock" : ""}`}
+                  >
+                    <div className="snakeCellTop">
+                      <span className="snakeTeam">{team}</span>
+                      <span className="snakePickNo">
+                        #{(row.round - 1) * (draft?.teams?.length || 0) + idx + 1}
+                      </span>
                     </div>
-                  );
-                })}
+                    <div className="snakePlayer">{pick?.name || "—"}</div>
+                    <div className="snakeMeta">{pick?.slotLabel || "Waiting"}</div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
-          {draftTeams.length === 0 && <div className="empty">No draft teams available.</div>}
         </div>
       </section>
     );
   }
 
   function renderDashboardView() {
+    const leaderboardSlice = tournamentLeaderboard.slice(0, 25);
+    const firstMissedCutIndex = leaderboardSlice.findIndex((p) => p?.made_cut === false);
+
     return (
       <>
         <div className="dashboardHero">
@@ -542,7 +511,6 @@ export default function App() {
                   <div className="standingsScore">{team.total}</div>
                 </div>
               ))}
-              {leagueStandings.length === 0 && <div className="empty">No standings yet.</div>}
             </div>
           </div>
         </div>
@@ -553,36 +521,47 @@ export default function App() {
           <section className="card">
             <h2 className="h2">Tournament Leaderboard</h2>
             <div className="list">
-              {tournamentLeaderboard.slice(0, 25).map((player, idx) => (
-                <div className="row leaderboardRow" key={`${player.golfer_name}-${idx}`}>
-                  <div className="leaderboardMain">
-                    <div className="name">#{idx + 1} {player.golfer_name}</div>
-                    <ScoreBreakdown
-                      basePoints={player.base_points}
-                      bonusPoints={player.bonus_points}
-                      placementBonus={player.placement_bonus}
-                      onOpenBreakdown={(kind) =>
-                        openScoreBreakdownModal({
-                          playerName: player.golfer_name,
-                          kind,
-                          basePoints: player.base_points ?? 0,
-                          bonusPoints: player.bonus_points ?? 0,
-                          placementBonus: player.placement_bonus ?? 0,
-                          highlights: player.highlights ?? [],
-                          totalPoints: player.fantasy_points ?? 0,
-                          baseBreakdown: player.base_breakdown ?? {},
-                          bonusBreakdown: player.bonus_breakdown ?? {},
-                          placementBreakdown: player.placement_breakdown ?? {},
-                          roundPoints: player.round_points ?? {},
-                        })
-                      }
-                    />
-                    <HighlightsRow highlights={player.highlights} />
+              {leaderboardSlice.map((player, idx) => (
+                <div key={`${player.golfer_name}-${idx}`}>
+                  {firstMissedCutIndex !== -1 && idx === firstMissedCutIndex && (
+                    <div className="cutLineRow">
+                      <span className="cutLineText">Cut Line</span>
+                    </div>
+                  )}
+                  <div className="row leaderboardRow">
+                    <div className="leaderboardMain">
+                      <div className={`name ${player.made_cut === false ? "missedCutName" : ""}`}>
+                        #{idx + 1} {player.golfer_name}
+                      </div>
+                      <ScoreBreakdown
+                        basePoints={player.base_points}
+                        bonusPoints={player.bonus_points}
+                        placementBonus={player.placement_bonus}
+                        onOpenBreakdown={(kind) =>
+                          openScoreBreakdownModal({
+                            playerName: player.golfer_name,
+                            kind,
+                            basePoints: player.base_points ?? 0,
+                            bonusPoints: player.bonus_points ?? 0,
+                            placementBonus: player.placement_bonus ?? 0,
+                            highlights: player.highlights ?? [],
+                            totalPoints: player.fantasy_points ?? 0,
+                            baseBreakdown: player.base_breakdown ?? {},
+                            bonusBreakdown: player.bonus_breakdown ?? {},
+                            placementBreakdown: player.placement_breakdown ?? {},
+                            roundPoints: player.round_points ?? {},
+                          })
+                        }
+                      />
+                      <HighlightsRow highlights={player.highlights} />
+                      {player.made_cut === false ? <div className="missedCutNote">Missed cut</div> : null}
+                    </div>
+                    <div className={`pts ${player.made_cut === false ? "missedCutText" : ""}`}>
+                      {player.fantasy_points}
+                    </div>
                   </div>
-                  <div className="pts">{player.fantasy_points}</div>
                 </div>
               ))}
-              {tournamentLeaderboard.length === 0 && <div className="empty">Leaderboard unavailable.</div>}
             </div>
           </section>
 
@@ -596,21 +575,9 @@ export default function App() {
                   </div>
                 </div>
               ))}
-              {(Array.isArray(room?.users) ? room.users : []).length === 0 && <div className="empty">No users joined.</div>}
             </div>
           </section>
         </div>
-
-        <section className="card picksCard">
-          <div className="sectionHeader">
-            <h2 className="h2">Team Rosters</h2>
-            <div className="pill">{leagueStandings.length} teams</div>
-          </div>
-          <div className="teamRosterGrid">
-            {leagueStandings.map((team) => renderTeamRosterCard(team))}
-            {leagueStandings.length === 0 && <div className="empty">No teams yet.</div>}
-          </div>
-        </section>
       </>
     );
   }
@@ -622,7 +589,16 @@ export default function App() {
           <section className="card">
             <div className="sectionHeader">
               <h2 className="h2">Available Players</h2>
-              <div className="pill">{draft?.started ? (isMyTurn ? "Your turn" : `Waiting: ${onClock}`) : "Waiting for host"}</div>
+              <div className="draftControls">
+                <div className="pill">
+                  {draft?.started ? (isMyTurn ? "Your turn" : `Waiting: ${onClock}`) : "Waiting for host"}
+                </div>
+                {isMyTurn ? (
+                  <button className="btn autoPickBtn" onClick={triggerAutoPick} disabled={autoPicking}>
+                    {autoPicking ? "Auto Picking..." : "Auto Pick"}
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             <input className="input" placeholder="Search..." value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -654,14 +630,13 @@ export default function App() {
                   <div className="pill">{isMyTurn ? "Draft" : "—"}</div>
                 </div>
               ))}
-              {available.length === 0 && <div className="empty">No available players.</div>}
             </div>
           </section>
 
           {renderMyTeamCard()}
         </div>
 
-        {renderDraftBoardCard()}
+        {renderSnakeDraftBoard()}
       </>
     );
   }
@@ -670,8 +645,8 @@ export default function App() {
     return (
       <div className="page">
         <div className="card" style={{ maxWidth: 520, margin: "80px auto" }}>
-          <h1 style={{ marginTop: 0 }}>Join the Draft</h1>
-          <p className="muted">Enter your name to enter the lobby.</p>
+          <h1 style={{ marginTop: 0 }} className="h2">Join the Draft</h1>
+          <p className="meta">Enter your name to enter the lobby.</p>
           <input
             className="input"
             placeholder="Your name"
@@ -682,7 +657,7 @@ export default function App() {
             }}
             style={{ width: "100%" }}
           />
-          {error && <div className="error">{error}</div>}
+          {error ? <div className="error">{error}</div> : null}
           <button className="btn primary" onClick={doJoin} style={{ marginTop: 12, width: "100%" }}>
             Continue
           </button>
@@ -712,8 +687,7 @@ export default function App() {
           </div>
 
           <div className="muted">
-            You are: <b>{me?.name || "…"}</b>{" "}
-            {me?.isHost ? <span className="pillHost">HOST</span> : null}
+            You are: <b>{me?.name || "…"}</b> {me?.isHost ? <span className="pillHost">HOST</span> : null}
             {" • "}
             {draft?.started
               ? draft.completed
@@ -722,16 +696,17 @@ export default function App() {
               : "Draft not started"}
           </div>
         </div>
+
         <div className="actions">
           <button className="btn" onClick={() => setViewMode("dashboard")}>Standings</button>
           <button className="btn" onClick={() => setViewMode("draft")}>Draft Room</button>
           <button className="btn" onClick={() => setViewMode("auto")}>Auto View</button>
 
-          {me?.isHost && !draft?.started && (
+          {me?.isHost && !draft?.started ? (
             <button className="btn primary" onClick={startDraft}>Start Draft</button>
-          )}
+          ) : null}
 
-          {me?.isHost && draft?.started && !draft?.completed && (
+          {me?.isHost && draft?.started && !draft?.completed ? (
             <div className="timerControls">
               <input
                 className="input timerInput"
@@ -743,21 +718,21 @@ export default function App() {
               />
               <button className="btn" onClick={updateTimer}>Update Timer</button>
             </div>
-          )}
-        </div>        
+          ) : null}
+        </div>
       </header>
 
-      {error && <div className="error" style={{ marginBottom: 10 }}>{error}</div>}
+      {error ? <div className="error" style={{ marginBottom: 10 }}>{error}</div> : null}
 
       {activeView === "draft" ? renderDraftView() : renderDashboardView()}
 
-      {slotModal && (
+      {slotModal ? (
         <div className="modalBackdrop" onClick={() => setSlotModal(null)}>
           <div className="modal smallModal" onClick={(e) => e.stopPropagation()}>
             <div className="modalHeader">
               <div>
                 <div className="modalTitle">Choose a slot for {slotModal.player.name}</div>
-                <div className="muted">This player qualifies for multiple categories.</div>
+                <div className="meta">This player qualifies for multiple categories.</div>
                 <div className="tagRow">
                   {getCategoryTags(slotModal.player).map((tag) => (
                     <span key={tag} className="categoryTag">{tag}</span>
@@ -776,9 +751,9 @@ export default function App() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {scoreBreakdownModal && (
+      {scoreBreakdownModal ? (
         <div className="modalBackdrop" onClick={() => setScoreBreakdownModal(null)}>
           <div className="modal smallModal" onClick={(e) => e.stopPropagation()}>
             <div className="modalHeader">
@@ -790,7 +765,7 @@ export default function App() {
                     ? "Bonus Score Breakdown"
                     : "Placement Bonus Breakdown"}
                 </div>
-                <div className="muted">
+                <div className="meta">
                   {scoreBreakdownModal.teamName ? `${scoreBreakdownModal.teamName}` : "Tournament leaderboard"}
                   {scoreBreakdownModal.slotLabel ? ` • ${scoreBreakdownModal.slotLabel}` : ""}
                 </div>
@@ -838,7 +813,7 @@ export default function App() {
                     </table>
                   </div>
                 ) : (
-                  <div className="muted">No points of this type yet.</div>
+                  <div className="meta">No points of this type yet.</div>
                 )}
               </div>
 
@@ -870,15 +845,15 @@ export default function App() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {holeModal && (
+      {holeModal ? (
         <div className="modalBackdrop" onClick={() => setHoleModal(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modalHeader">
               <div>
-                <div className="modalTitle">{holeModal.name}</div>
-                <div className="muted">Fantasy points: {holeModal.fantasyPoints ?? 0}</div>
+                <div className={`modalTitle ${holeModal.madeCut === false ? "missedCutName" : ""}`}>{holeModal.name}</div>
+                <div className="meta">Fantasy points: {holeModal.fantasyPoints ?? 0}</div>
                 <ScoreBreakdown
                   basePoints={holeModal.basePoints}
                   bonusPoints={holeModal.bonusPoints}
@@ -918,13 +893,10 @@ export default function App() {
                   </div>
                 </div>
               ))}
-              {(Array.isArray(holeModal.holes) ? holeModal.holes : []).length === 0 && (
-                <div className="empty">Hole-by-hole provider is currently stubbed.</div>
-              )}
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

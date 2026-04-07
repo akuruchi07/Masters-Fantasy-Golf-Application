@@ -57,7 +57,7 @@ class LivePlayerScorecard:
     fantasy_points: float
     holes: List[HoleScore]
     updated_ts: float
-    made_cut: bool
+    made_cut: Optional[bool]
     round_points: Dict[int, float]
     round_hole_points: Dict[int, float]
     round_bonus_points: Dict[int, float]
@@ -117,26 +117,33 @@ def points_for_result(result: str) -> float:
     return HOLE_POINTS.get(result, 0.0)
 
 
-def infer_made_cut(raw_golfer: dict) -> bool:
+def infer_made_cut(raw_golfer: dict) -> Optional[bool]:
     status = (raw_golfer.get("status") or {}).get("type", {}) if isinstance(raw_golfer.get("status"), dict) else {}
     status_name = str(status.get("name") or "").lower()
     status_state = str(status.get("state") or "").lower()
     detail = str(status.get("detail") or "").lower()
 
-    if "cut" in detail and "made" not in detail:
+    rounds = raw_golfer.get("rounds") or []
+    rounds_completed = sum(1 for rnd in rounds if any(h.get("strokes") is not None for h in rnd))
+
+    if "made cut" in detail:
+        return True
+    if "missed cut" in detail or (("cut" in detail) and ("made" not in detail)):
         return False
     if status_name in {"cut", "missed_cut"}:
         return False
-    if status_state in {"post", "complete"}:
-        return True
-
-    rounds = raw_golfer.get("rounds") or []
-    rounds_completed = sum(1 for rnd in rounds if any(h.get("strokes") is not None for h in rnd))
     if rounds_completed >= 3:
         return True
+
+    # Before the cut is official after Friday, treat as unknown.
     if rounds_completed < 2:
-        return False
-    return True
+        return None
+
+    # If exactly two rounds are complete but no explicit cut result, still unknown.
+    if rounds_completed == 2 and status_state not in {"post", "complete"}:
+        return None
+
+    return None
 
 
 def placement_bonus(rank: int) -> float:
@@ -251,11 +258,7 @@ def build_hole_scores(rounds: List[List[dict]]) -> Tuple[List[HoleScore], Dict[i
             holes_out.append(hs)
             grouped[round_index].append(hs)
 
-            if result in {"double_bogey", "worse"}:
-                key = "double_bogey_or_worse"
-            else:
-                key = result
-
+            key = "double_bogey_or_worse" if result in {"double_bogey", "worse"} else result
             round_base_breakdown[round_index][key]["count"] += 1
             round_base_breakdown[round_index][key]["total"] = round(
                 round_base_breakdown[round_index][key]["total"] + base_points, 2
@@ -290,8 +293,6 @@ def compute_round_bonuses(round_num: int, holes: List[HoleScore]) -> Tuple[float
                 bonus += THREE_BIRDIES_STREAK_BONUS
                 streak_count += 1
                 streak_awarded = True
-            elif streak < 3:
-                pass
         else:
             streak = 0
             streak_awarded = False
@@ -301,9 +302,7 @@ def compute_round_bonuses(round_num: int, holes: List[HoleScore]) -> Tuple[float
         breakdown["three_birdies_streak"]["total"] = round(
             breakdown["three_birdies_streak"]["total"] + streak_count * THREE_BIRDIES_STREAK_BONUS, 2
         )
-        highlights.append(
-            f"{streak_count} Birdie Streak Bonus" if streak_count > 1 else "Birdie Streak Bonus"
-        )
+        highlights.append(f"{streak_count} Birdie Streak Bonus" if streak_count > 1 else "Birdie Streak Bonus")
 
     if round_complete([{"strokes": h.strokes, "par": h.par} for h in holes]):
         if all(h.result not in {"bogey", "double_bogey", "worse"} for h in holes):
@@ -392,12 +391,13 @@ def all_positions_final(golfers: List[dict]) -> bool:
 
     finished_count = 0
     for g in golfers:
+        cut_status = infer_made_cut(g)
         status = (g.get("status") or {}).get("type", {}) if isinstance(g.get("status"), dict) else {}
         state = str(status.get("state") or "").lower()
         rounds = g.get("rounds") or []
         rounds_completed = sum(1 for rnd in rounds if any(h.get("strokes") is not None for h in rnd))
 
-        if state in {"post", "complete"} or rounds_completed >= 4 or not infer_made_cut(g):
+        if state in {"post", "complete"} or rounds_completed >= 4 or cut_status is False:
             finished_count += 1
 
     return finished_count == len(golfers)
@@ -405,7 +405,7 @@ def all_positions_final(golfers: List[dict]) -> bool:
 
 def aggregate_breakdowns_for_rounds(round_breakdowns: Dict[int, Dict[str, dict]], rounds_to_use: List[int]) -> Dict[str, dict]:
     if not round_breakdowns:
-      return {}
+        return {}
 
     sample = next(iter(round_breakdowns.values()), None)
     aggregated = {}
@@ -486,7 +486,7 @@ def build_team_scoreboard(
             if not player:
                 continue
             sc = scorecards.get(player["athleteId"])
-            if sc and not sc.made_cut:
+            if sc and sc.made_cut is False:
                 missed_starters.append(slot)
 
         active_backups = set(BACKUP_SLOTS[: min(len(missed_starters), len(BACKUP_SLOTS))])
@@ -522,7 +522,7 @@ def build_team_scoreboard(
 
             sc = scorecards.get(player["athleteId"])
             is_backup = slot_name in BACKUP_SLOTS
-            is_active_backup = slot_name in active_backups and bool(sc and sc.made_cut)
+            is_active_backup = slot_name in active_backups and bool(sc and sc.made_cut is True)
 
             if not sc:
                 players_out.append(
@@ -553,24 +553,28 @@ def build_team_scoreboard(
                 placement_points = sc.placement_bonus if is_active_backup else 0.0
                 status = "active_backup" if is_active_backup else "bench"
             else:
-                rounds_to_use = [1, 2, 3, 4] if sc.made_cut else [1, 2]
-                placement_points = sc.placement_bonus if sc.made_cut else 0.0
-                status = "missed_cut" if not sc.made_cut else "starter"
+                rounds_to_use = [1, 2, 3, 4] if sc.made_cut is True else ([1, 2] if sc.made_cut is False else [1, 2])
+                placement_points = sc.placement_bonus if sc.made_cut is True else 0.0
+                status = "missed_cut" if sc.made_cut is False else "starter"
 
             base_breakdown = aggregate_breakdowns_for_rounds(sc.round_base_breakdown, rounds_to_use)
             bonus_breakdown = aggregate_breakdowns_for_rounds(sc.round_bonus_breakdown, rounds_to_use)
 
             base_points = round(sum(v["total"] for v in base_breakdown.values()), 2)
             bonus_points = round(sum(v["total"] for v in bonus_breakdown.values()), 2)
-            placement_breakdown = {
-                "placement_bonus": {
-                    "label": "Placement Bonus",
-                    "count": 1 if placement_points > 0 else 0,
-                    "pointsEach": placement_points if placement_points > 0 else 0.0,
-                    "total": round(placement_points, 2),
-                    "rank": sc.rank,
+            placement_breakdown = (
+                {
+                    "placement_bonus": {
+                        "label": "Placement Bonus",
+                        "count": 1 if placement_points > 0 else 0,
+                        "pointsEach": placement_points if placement_points > 0 else 0.0,
+                        "total": round(placement_points, 2),
+                        "rank": sc.rank,
+                    }
                 }
-            } if placement_points > 0 else {}
+                if placement_points > 0
+                else {}
+            )
             fantasy_points = round(base_points + bonus_points + placement_points, 2)
 
             team_total += fantasy_points

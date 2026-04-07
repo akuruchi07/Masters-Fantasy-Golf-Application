@@ -123,11 +123,11 @@ AMERICANS = {
 }
 
 NON_PGA_TOUR = {
-    # LIV players
     "bryson-dechambeau",
     "sergio-garcia",
     "tyrrell-hatton",
     "dustin-johnson",
+    "brooks-koepka",
     "tom-mckibbin",
     "carlos-ortiz",
     "jon-rahm",
@@ -135,8 +135,6 @@ NON_PGA_TOUR = {
     "charl-schwartzel",
     "cameron-smith",
     "bubba-watson",
-
-    # amateurs / non-PGA invitees
     "ethan-fang",
     "jackson-herrington",
     "brandon-holtz",
@@ -148,8 +146,6 @@ NON_PGA_TOUR = {
     "marco-penge",
     "kristoffer-reitan",
     "rasmus-neergaard-petersen",
-
-    # past champions / non-PGA regulars
     "angel-cabrera",
     "fred-couples",
     "jose-maria-olazabal",
@@ -172,7 +168,7 @@ def player_meta_from_name(name: str) -> Dict[str, Any]:
     }
 
 
-def load_top_players(limit: int = 50) -> List[Dict[str, Any]]:
+def load_players() -> List[Dict[str, Any]]:
     if not os.path.exists(PLAYERS_CSV):
         raise HTTPException(status_code=500, detail="players.csv not found in backend folder.")
     players: List[Dict[str, Any]] = []
@@ -184,10 +180,10 @@ def load_top_players(limit: int = 50) -> List[Dict[str, Any]]:
             name = (row.get("name") or "").strip()
             if name:
                 players.append(player_meta_from_name(name))
-    return players[:limit]
+    return players
 
 
-DRAFT_POOL = load_top_players(50)
+DRAFT_POOL = load_players()
 PLAYER_MAP = {p["athleteId"]: p for p in DRAFT_POOL}
 scorecards: Dict[str, LivePlayerScorecard] = {}
 
@@ -281,6 +277,26 @@ def serialize_scoreboard() -> Dict[str, Any]:
     return {"teams": teams_out, "updatedTs": time.time()}
 
 
+def do_auto_pick_for_team(team_name: str) -> bool:
+    d = ROOM.draft
+    available = [p for p in DRAFT_POOL if p["athleteId"] not in d.picked_ids]
+    picked_player = None
+    picked_slot = None
+
+    for p in available:
+        auto_slot = d.next_auto_slot(team_name, p)
+        if auto_slot:
+            picked_player = p
+            picked_slot = auto_slot
+            break
+
+    if picked_player and picked_slot:
+        d.make_pick(picked_player["athleteId"], picked_player["name"], picked_slot, picked_player)
+        return True
+
+    return False
+
+
 async def draft_clock_loop():
     while True:
         await asyncio.sleep(1)
@@ -299,22 +315,11 @@ async def draft_clock_loop():
         if not team:
             continue
 
-        available = [p for p in DRAFT_POOL if p["athleteId"] not in d.picked_ids]
-        picked_player = None
-        picked_slot = None
-        for p in available:
-            auto_slot = d.next_auto_slot(team, p)
-            if auto_slot:
-                picked_player = p
-                picked_slot = auto_slot
-                break
-
-        if picked_player and picked_slot:
-            try:
-                d.make_pick(picked_player["athleteId"], picked_player["name"], picked_slot, picked_player)
-            except Exception:
+        try:
+            picked = do_auto_pick_for_team(team)
+            if not picked:
                 d.advance_turn()
-        else:
+        except Exception:
             d.advance_turn()
 
         await broadcast({"type": "room_state", "data": serialize_room_state()})
@@ -367,14 +372,20 @@ class UpdateTimerReq(BaseModel):
     seconds_per_pick: int
 
 
+class AutoPickReq(BaseModel):
+    userId: str
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
 
 
 @app.get("/api/field")
-def field(limit: int = 50):
-    return {"players": DRAFT_POOL[:limit], "slotLabels": SLOT_LABELS}
+def field(limit: int = 0):
+    if limit and limit > 0:
+      return {"players": DRAFT_POOL[:limit], "slotLabels": SLOT_LABELS}
+    return {"players": DRAFT_POOL, "slotLabels": SLOT_LABELS}
 
 
 @app.get("/api/state")
@@ -453,6 +464,28 @@ async def update_timer(req: UpdateTimerReq):
 
     state_out = serialize_room_state()
     await broadcast({"type": "room_state", "data": state_out})
+    return state_out
+
+
+@app.post("/api/draft/auto-pick")
+async def auto_pick(req: AutoPickReq):
+    u = ROOM.users.get(req.userId)
+    if not u:
+        raise HTTPException(status_code=401, detail="Join first.")
+
+    d = ROOM.draft
+    if not d.started or d.completed:
+        raise HTTPException(status_code=400, detail="Draft not active.")
+    if d.current_team() != u.name:
+        raise HTTPException(status_code=403, detail=f"Not your turn. On the clock: {d.current_team()}")
+
+    picked = do_auto_pick_for_team(u.name)
+    if not picked:
+        raise HTTPException(status_code=400, detail="No valid auto-pick available.")
+
+    state_out = serialize_room_state()
+    await broadcast({"type": "room_state", "data": state_out})
+    await broadcast({"type": "scoreboard", "data": serialize_scoreboard()})
     return state_out
 
 
@@ -541,6 +574,7 @@ def player_holes(athlete_id: str):
             "bonusBreakdown": {},
             "placementBreakdown": {},
             "roundPoints": {},
+            "madeCut": None,
         }
 
     return {

@@ -21,7 +21,7 @@ async function jpost(path, body) {
 }
 
 export const api = {
-  field: (limit = 50) => jget(`/field?limit=${limit}`),
+  field: (limit = 0) => jget(`/field?limit=${limit}`),
   join: (userId, name) => jpost("/join", { userId, name }),
   state: () => jget("/state"),
   scoreboard: () => jget("/scoreboard"),
@@ -29,6 +29,7 @@ export const api = {
   resetDraft: (userId) => jpost("/draft/reset", { userId }),
   updateTimer: (userId, secondsPerPick) =>
     jpost("/draft/timer", { userId, seconds_per_pick: secondsPerPick }),
+  autoPick: (userId) => jpost("/draft/auto-pick", { userId }),
   pick: (userId, athleteId, name, slot = null) =>
     jpost("/draft/pick", { userId, athlete_id: athleteId, name, slot }),
   eligibleSlots: (userId, athleteId) =>

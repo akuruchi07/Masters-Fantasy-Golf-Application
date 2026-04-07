@@ -15,7 +15,7 @@
   --danger: #b42318;
   --danger-soft: #fde7e4;
   --white: #ffffff;
-  --shadow: 0 8px 24px rgba(7, 23, 15, 0.10);
+  --shadow: 0 8px 24px rgba(7, 23, 15, 0.1);
 }
 
 * { box-sizing: border-box; }
@@ -24,7 +24,7 @@ body {
   margin: 0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   background:
-    radial-gradient(circle at top, rgba(212, 175, 55, 0.10), transparent 28%),
+    radial-gradient(circle at top, rgba(212, 175, 55, 0.1), transparent 28%),
     linear-gradient(180deg, #0f291d 0%, #0d1f17 100%);
   color: var(--white);
 }
@@ -33,12 +33,6 @@ body {
   max-width: 1480px;
   margin: 0 auto;
   padding: 18px;
-}
-
-.h1 {
-  margin: 0;
-  font-size: 28px;
-  color: var(--white);
 }
 
 .h2 {
@@ -63,6 +57,57 @@ body {
   border: 1px solid rgba(212, 175, 55, 0.28);
   border-radius: 18px;
   box-shadow: var(--shadow);
+  position: relative;
+}
+
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: -8px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.8), transparent);
+}
+
+.topbarLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.brandRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brandBadge {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #1f6b43, #145233);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #f5e7b1;
+  border: 1px solid rgba(212, 175, 55, 0.6);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+
+.brandTitle {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  color: #ffffff;
+}
+
+.brandSubtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 2px;
 }
 
 .actions {
@@ -72,13 +117,7 @@ body {
   flex-wrap: wrap;
 }
 
-.layout {
-  display: grid;
-  grid-template-columns: 420px 360px 1fr;
-  gap: 16px;
-  align-items: start;
-}
-
+.layout,
 .threeCol {
   display: grid;
   grid-template-columns: 420px 360px 1fr;
@@ -128,6 +167,10 @@ body {
   background: linear-gradient(180deg, #f1df94 0%, #e3cc72 100%);
 }
 
+.autoPickBtn {
+  white-space: nowrap;
+}
+
 .input {
   width: 100%;
   margin-top: 10px;
@@ -141,7 +184,7 @@ body {
 .input:focus {
   outline: none;
   border-color: rgba(31, 107, 67, 0.55);
-  box-shadow: 0 0 0 3px rgba(31, 107, 67, 0.10);
+  box-shadow: 0 0 0 3px rgba(31, 107, 67, 0.1);
 }
 
 .timerControls {
@@ -162,12 +205,12 @@ body {
   border-top: 1px solid var(--border);
 }
 
-.lobbyList {
-  max-height: 180px;
-}
-
 .rosterList {
   max-height: 640px;
+}
+
+.lobbyList {
+  max-height: 180px;
 }
 
 .row {
@@ -246,12 +289,6 @@ body {
   font-weight: 800;
 }
 
-.teams {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-}
-
 .teamHeader {
   display: flex;
   justify-content: space-between;
@@ -265,40 +302,6 @@ body {
 
 .empty {
   padding: 12px 6px;
-  color: var(--muted);
-}
-
-.picksCard {
-  margin-top: 16px;
-}
-
-.picks {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.pick {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 10px;
-  display: flex;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.55);
-}
-
-.pickNo {
-  font-weight: 900;
-  color: var(--gold);
-}
-
-.pickName {
-  font-weight: 800;
-}
-
-.pickMeta {
-  font-size: 12px;
   color: var(--muted);
 }
 
@@ -395,6 +398,13 @@ body {
   gap: 10px;
 }
 
+.draftControls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .tagRow {
   display: flex;
   flex-wrap: wrap;
@@ -405,7 +415,7 @@ body {
 .categoryTag {
   padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(31, 107, 67, 0.20);
+  border: 1px solid rgba(31, 107, 67, 0.2);
   background: var(--accent-soft);
   color: var(--accent-strong);
   font-size: 11px;
@@ -588,7 +598,7 @@ body {
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.76), rgba(246,240,227,0.9));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(246, 240, 227, 0.9));
 }
 
 .standingsRank {
@@ -616,18 +626,11 @@ body {
   color: var(--accent);
 }
 
-.teamRosterGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 12px;
-}
-
 .teamRosterCard {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 12px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(247,243,234,0.96));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(247, 243, 234, 0.96));
 }
 
 .teamRosterHeader {
@@ -654,6 +657,13 @@ body {
   font-size: 22px;
   font-weight: 900;
   color: var(--accent);
+}
+
+.teamRosterGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 12px;
 }
 
 .teamRosterSlots {
@@ -700,81 +710,109 @@ body {
   margin-top: 4px;
 }
 
-.draftBoardGrid {
+.snakeBoard {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
   margin-top: 12px;
 }
 
-.draftBoardCard {
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 12px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(247,243,234,0.96));
+.snakeRound {
+  display: grid;
+  gap: 8px;
 }
 
-.draftBoardHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 10px;
-}
-
-.draftBoardName {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--text-strong);
-}
-
-.draftBoardMeta {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 4px;
-}
-
-.draftingNowPill {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(31, 107, 67, 0.12);
-  border: 1px solid rgba(31, 107, 67, 0.28);
+.snakeRoundLabel {
+  font-size: 13px;
+  font-weight: 900;
   color: var(--accent-strong);
-  font-size: 11px;
-  font-weight: 800;
 }
 
-.draftBoardSlots {
+.snakeRoundPicks {
   display: grid;
-  gap: 6px;
-}
-
-.draftBoardSlotRow {
-  display: grid;
-  grid-template-columns: 145px 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
-  align-items: center;
+}
+
+.snakeCell {
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: 14px;
+  padding: 10px;
   background: rgba(255, 255, 255, 0.72);
 }
 
-.draftBoardSlotLabel {
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 700;
+.snakeCellOnClock {
+  border-color: rgba(31, 107, 67, 0.45);
+  box-shadow: 0 0 0 3px rgba(31, 107, 67, 0.1);
 }
 
-.draftBoardSlotPlayer {
-  font-size: 13px;
-  font-weight: 700;
+.snakeCellTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.snakeTeam {
+  font-size: 12px;
+  font-weight: 800;
   color: var(--text-strong);
 }
 
-.draftBoardSlotEmpty {
+.snakePickNo {
+  font-size: 11px;
   color: var(--muted);
+  font-weight: 700;
+}
+
+.snakePlayer {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.snakeMeta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cutLineRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 6px 0;
+}
+
+.cutLineRow::before,
+.cutLineRow::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.75), rgba(212, 175, 55, 0.15));
+}
+
+.cutLineText {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7a5d00;
+  background: rgba(212, 175, 55, 0.14);
+  border: 1px solid rgba(212, 175, 55, 0.32);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.missedCutNote,
+.missedCutText,
+.missedCutName {
+  color: var(--danger) !important;
+}
+
+.missedCutNote {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .missingCategoryText {
@@ -789,31 +827,18 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .picks {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .teamRosterGrid,
-  .draftBoardGrid {
+  .teamRosterGrid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 700px) {
-  .picks {
-    grid-template-columns: 1fr;
-  }
-
   .standingsRow {
     grid-template-columns: 56px 1fr 88px;
   }
 
   .dashboardTitle {
     font-size: 22px;
-  }
-
-  .draftBoardSlotRow {
-    grid-template-columns: 1fr;
   }
 
   .holeRow {
@@ -825,63 +850,7 @@ body {
     padding: 14px;
   }
 
-  .topbarLeft {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .brandRow {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .brandBadge {
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    background: linear-gradient(180deg, #1f6b43, #145233);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    color: #f5e7b1;
-    border: 1px solid rgba(212, 175, 55, 0.6);
-    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
-  }
-
-  .brandTitle {
-    margin: 0;
-    font-size: 26px;
-    font-weight: 900;
-    letter-spacing: 0.3px;
-    color: #ffffff;
-  }
-
-  .brandSubtitle {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.75);
-    margin-top: 2px;
-  }
-
-  /* Gold divider under topbar */
-  .topbar {
-    position: relative;
-  }
-
-  .topbar::after {
-    content: "";
-    position: absolute;
-    left: 20px;
-    right: 20px;
-    bottom: -8px;
-    height: 2px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(212, 175, 55, 0.8),
-      transparent
-    );
+  .snakeRoundPicks {
+    grid-template-columns: 1fr;
   }
 }
