@@ -794,7 +794,7 @@ export default function App() {
           <button className={`btn navBtn ${draftRoomActive ? "navBtnActive" : ""}`} onClick={() => setViewMode("draft")}>
             Draft Room
           </button>
-          <button className="btn" onClick={() => setViewMode("auto")}>Auto View</button>
+          {/* <button className="btn" onClick={() => setViewMode("auto")}>Auto View</button> */}
 
           {me?.isHost && !draft?.started ? (
             <button className="btn primary" onClick={startDraft}>Start Draft</button>
