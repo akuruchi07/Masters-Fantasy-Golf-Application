@@ -154,8 +154,6 @@ NON_PGA_TOUR = {
     "danny-willett",
 }
 
-# Seeded from the current Masters futures market ordering so auto-pick chooses
-# the strongest remaining golfer for the slot it is trying to fill.
 AUTO_DRAFT_PRIORITY = [
     "scottie-scheffler",
     "bryson-dechambeau",
@@ -163,42 +161,23 @@ AUTO_DRAFT_PRIORITY = [
     "jon-rahm",
     "ludvig-aberg",
     "xander-schauffele",
-    "cameron-young",
-    "justin-rose",
     "hideki-matsuyama",
-    "tommy-fleetwood",
     "collin-morikawa",
     "tyrrell-hatton",
-    "viktor-hovland",
     "brooks-koepka",
-    "jordan-spieth",
     "patrick-cantlay",
-    "shane-lowry",
     "justin-thomas",
-    "corey-conners",
-    "robert-macintyre",
     "russell-henley",
-    "min-woo-lee",
-    "jason-day",
-    "patrick-reed",
     "cameron-smith",
-    "matt-fitzpatrick",
-    "sungjae-im",
-    "tom-mckibbin",
+    "patrick-reed",
+    "jordan-spieth",
     "daniel-berger",
     "keegan-bradley",
     "wyndham-clark",
     "harris-english",
-    "sepp-straka",
-    "nick-taylor",
-    "aaron-rai",
-    "ryan-fox",
-    "tommy-fleetwood",
-    "sergio-garcia",
     "sam-burns",
     "akshay-bhatia",
 ]
-
 AUTO_DRAFT_RANK = {name: idx for idx, name in enumerate(AUTO_DRAFT_PRIORITY)}
 
 
@@ -232,28 +211,6 @@ def load_players() -> List[Dict[str, Any]]:
 
 def player_priority_score(player: Dict[str, Any]) -> int:
     return AUTO_DRAFT_RANK.get(player["athleteId"], 10_000)
-
-
-def next_required_slot_for_team(team_name: str) -> Optional[str]:
-    roster = ROOM.draft.rosters.get(team_name, {})
-    for slot in STARTER_SLOTS:
-        if roster.get(slot) is None:
-            return slot
-    return None
-
-
-def fits_slot(player: Dict[str, Any], slot: str) -> bool:
-    if slot == "past_champion":
-        return bool(player.get("isPastChampion"))
-    if slot == "international":
-        return bool(player.get("isInternational"))
-    if slot == "american":
-        return bool(player.get("isAmerican"))
-    if slot == "non_pga":
-        return bool(player.get("isNonPga"))
-    if slot in {"wildcard", "backup_1", "backup_2"}:
-        return True
-    return False
 
 
 DRAFT_POOL = load_players()
@@ -351,18 +308,33 @@ def serialize_scoreboard() -> Dict[str, Any]:
     return {"teams": teams_out, "updatedTs": time.time()}
 
 
+def next_open_slot_for_team(team_name: str) -> Optional[str]:
+    roster = ROOM.draft.rosters.get(team_name, {})
+    slot_order = [
+        "past_champion",
+        "international",
+        "american",
+        "non_pga",
+        "wildcard",
+        "backup_1",
+        "backup_2",
+    ]
+    for slot in slot_order:
+        if roster.get(slot) is None:
+            return slot
+    return None
+
+
 def best_available_for_slot(team_name: str, slot: str) -> Optional[Dict[str, Any]]:
     d = ROOM.draft
     candidates = []
+
     for player in DRAFT_POOL:
         if player["athleteId"] in d.picked_ids:
             continue
         eligible = d.eligible_slots(team_name, player)
-        if slot not in eligible:
-            continue
-        if not fits_slot(player, slot):
-            continue
-        candidates.append(player)
+        if slot in eligible:
+            candidates.append(player)
 
     if not candidates:
         return None
@@ -373,25 +345,16 @@ def best_available_for_slot(team_name: str, slot: str) -> Optional[Dict[str, Any
 
 def do_auto_pick_for_team(team_name: str) -> bool:
     d = ROOM.draft
-    next_slot = next_required_slot_for_team(team_name)
+    next_slot = next_open_slot_for_team(team_name)
+    if not next_slot:
+        return False
 
-    if next_slot:
-        player = best_available_for_slot(team_name, next_slot)
-        if player:
-            d.make_pick(player["athleteId"], player["name"], next_slot, player)
-            return True
+    player = best_available_for_slot(team_name, next_slot)
+    if not player:
+        return False
 
-    # After starters are filled, use highest-ranked remaining player for backups/wildcards
-    available = [p for p in DRAFT_POOL if p["athleteId"] not in d.picked_ids]
-    available.sort(key=player_priority_score)
-
-    for player in available:
-        auto_slot = d.next_auto_slot(team_name, player)
-        if auto_slot:
-            d.make_pick(player["athleteId"], player["name"], auto_slot, player)
-            return True
-
-    return False
+    d.make_pick(player["athleteId"], player["name"], next_slot, player)
+    return True
 
 
 async def draft_clock_loop():
@@ -574,7 +537,7 @@ async def auto_pick(req: AutoPickReq):
     if not d.started or d.completed:
         raise HTTPException(status_code=400, detail="Draft not active.")
     if d.current_team() != u.name:
-        raise HTTPException(status_code=403, detail=f"Not your turn. On the clock: {d.current_team()}")
+        raise HTTPException(status_code=403, detail=f"Not your turn. On the clock: {d.currentTeam()}")
 
     picked = do_auto_pick_for_team(u.name)
     if not picked:

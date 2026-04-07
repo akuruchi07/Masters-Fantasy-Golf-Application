@@ -117,6 +117,27 @@ body {
   flex-wrap: wrap;
 }
 
+.navBtn {
+  position: relative;
+}
+
+.navBtnActive {
+  background: linear-gradient(180deg, var(--gold-soft) 0%, #ebd98d 100%);
+  color: #3c2c00;
+  border-color: rgba(138, 104, 8, 0.28);
+}
+
+.navBtnActive::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -6px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--gold);
+}
+
 .layout,
 .threeCol {
   display: grid;
@@ -249,6 +270,14 @@ body {
 }
 
 .clickableName:hover {
+  text-decoration: underline;
+}
+
+.clickableTeamName {
+  cursor: pointer;
+}
+
+.clickableTeamName:hover {
   text-decoration: underline;
 }
 
@@ -682,6 +711,56 @@ body {
   margin-top: 4px;
   font-size: 12px;
   color: var(--muted);
+}
+
+.teamRosterSlots {
+  display: grid;
+  gap: 8px;
+}
+
+.modalTeamRosterSlots {
+  margin-top: 14px;
+  max-height: 65vh;
+  overflow: auto;
+}
+
+.teamRosterSlot {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.teamRosterSlotTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.teamRosterSlotLabel {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.teamRosterSlotPoints {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--accent);
+}
+
+.teamRosterPlayerName {
+  font-size: 15px;
+  font-weight: 800;
+  margin-top: 4px;
+  color: var(--text-strong);
+}
+
+.teamRosterPlayerMeta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
 }
 
 .cutLineRow {

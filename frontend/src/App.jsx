@@ -145,6 +145,81 @@ function buildColumnDraftBoard(teams, picks) {
   return columns;
 }
 
+function TeamDetailModal({ team, onClose, onOpenBreakdown, onOpenHoles }) {
+  if (!team) return null;
+
+  return (
+    <div className="modalBackdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modalHeader">
+          <div>
+            <div className="modalTitle">{team.teamName}</div>
+            <div className="meta">Team total: {team.total ?? 0}</div>
+          </div>
+          <button className="btn" onClick={onClose}>Close</button>
+        </div>
+
+        <div className="teamRosterSlots modalTeamRosterSlots">
+          {(Array.isArray(team.players) ? team.players : []).map((p) => (
+            <div className="teamRosterSlot" key={`${team.teamName}-${p.slot}`}>
+              <div className="teamRosterSlotTop">
+                <span className="teamRosterSlotLabel">{p.slotLabel}</span>
+                <span className={`teamRosterSlotPoints ${p.status === "missed_cut" ? "missedCutText" : ""}`}>
+                  {p.fantasyPoints ?? 0}
+                </span>
+              </div>
+              <div
+                className={`teamRosterPlayerName ${p.status === "missed_cut" ? "missedCutName" : ""} ${p.name ? "clickableName" : ""}`}
+                onClick={() => p.name && onOpenHoles?.(p.athleteId, p.name)}
+              >
+                {p.name || "Empty"}
+              </div>
+              <div className={`teamRosterPlayerMeta ${p.status === "missed_cut" ? "missedCutText" : ""}`}>
+                {p.name
+                  ? p.status === "missed_cut"
+                    ? "Missed cut"
+                    : p.status === "active_backup"
+                    ? "Active backup"
+                    : p.status === "bench"
+                    ? "Bench"
+                    : "Scoring"
+                  : "No player assigned"}
+              </div>
+              {p.name ? (
+                <>
+                  <ScoreBreakdown
+                    basePoints={p.basePoints}
+                    bonusPoints={p.bonusPoints}
+                    placementBonus={p.placementBonus}
+                    onOpenBreakdown={(kind) =>
+                      onOpenBreakdown?.({
+                        playerName: p.name,
+                        teamName: team.teamName,
+                        slotLabel: p.slotLabel,
+                        kind,
+                        basePoints: p.basePoints ?? 0,
+                        bonusPoints: p.bonusPoints ?? 0,
+                        placementBonus: p.placementBonus ?? 0,
+                        roundPoints: p.roundPoints ?? {},
+                        highlights: p.scoringHighlights ?? [],
+                        totalPoints: p.fantasyPoints ?? 0,
+                        baseBreakdown: p.baseBreakdown ?? {},
+                        bonusBreakdown: p.bonusBreakdown ?? {},
+                        placementBreakdown: p.placementBreakdown ?? {},
+                      })
+                    }
+                  />
+                  <HighlightsRow highlights={p.scoringHighlights} />
+                </>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const userId = useMemo(() => getOrCreateUserId(), []);
   const [name, setName] = useState(localStorage.getItem("masters_name") || "");
@@ -159,6 +234,7 @@ export default function App() {
   const [holeModal, setHoleModal] = useState(null);
   const [slotModal, setSlotModal] = useState(null);
   const [scoreBreakdownModal, setScoreBreakdownModal] = useState(null);
+  const [teamModal, setTeamModal] = useState(null);
   const [error, setError] = useState("");
   const [tournamentLeaderboard, setTournamentLeaderboard] = useState([]);
   const [timerInput, setTimerInput] = useState(60);
@@ -375,6 +451,11 @@ export default function App() {
     setHoleModal({ athleteId, name: playerName, ...data });
   }
 
+  function openTeam(teamName) {
+    const team = leagueStandings.find((t) => t.teamName === teamName);
+    if (team) setTeamModal(team);
+  }
+
   function renderMyTeamCard() {
     const starterSlots = new Set(Array.isArray(draft?.starterSlots) ? draft.starterSlots : []);
 
@@ -485,7 +566,7 @@ export default function App() {
   }
 
   function renderDashboardView() {
-    const leaderboardSlice = tournamentLeaderboard.slice(0, 25);
+    const leaderboardSlice = tournamentLeaderboard.slice(0, 50);
     const firstMissedCutIndex = leaderboardSlice.findIndex((p) => p?.made_cut === false);
 
     return (
@@ -507,7 +588,9 @@ export default function App() {
                 <div className="standingsRow" key={team.teamName}>
                   <div className="standingsRank">#{idx + 1}</div>
                   <div className="standingsTeamBlock">
-                    <div className="standingsTeamName">{team.teamName}</div>
+                    <div className="standingsTeamName clickableTeamName" onClick={() => openTeam(team.teamName)}>
+                      {team.teamName}
+                    </div>
                     <div className="standingsTeamMeta">
                       {team.players.filter((p) => p.name).length} / 7 roster spots filled
                     </div>
@@ -678,6 +761,9 @@ export default function App() {
       : flattenBreakdownMap(scoreBreakdownModal.placementBreakdown)
     : [];
 
+  const standingsActive = activeView === "dashboard";
+  const draftRoomActive = activeView === "draft";
+
   return (
     <div className="page">
       <header className="topbar">
@@ -702,8 +788,12 @@ export default function App() {
         </div>
 
         <div className="actions">
-          <button className="btn" onClick={() => setViewMode("dashboard")}>Standings</button>
-          <button className="btn" onClick={() => setViewMode("draft")}>Draft Room</button>
+          <button className={`btn navBtn ${standingsActive ? "navBtnActive" : ""}`} onClick={() => setViewMode("dashboard")}>
+            Standings
+          </button>
+          <button className={`btn navBtn ${draftRoomActive ? "navBtnActive" : ""}`} onClick={() => setViewMode("draft")}>
+            Draft Room
+          </button>
           <button className="btn" onClick={() => setViewMode("auto")}>Auto View</button>
 
           {me?.isHost && !draft?.started ? (
@@ -729,6 +819,13 @@ export default function App() {
       {error ? <div className="error" style={{ marginBottom: 10 }}>{error}</div> : null}
 
       {activeView === "draft" ? renderDraftView() : renderDashboardView()}
+
+      <TeamDetailModal
+        team={teamModal}
+        onClose={() => setTeamModal(null)}
+        onOpenBreakdown={openScoreBreakdownModal}
+        onOpenHoles={openHoles}
+      />
 
       {slotModal ? (
         <div className="modalBackdrop" onClick={() => setSlotModal(null)}>
