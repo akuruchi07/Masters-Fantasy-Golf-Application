@@ -122,7 +122,8 @@ function aggregateNestedBreakdown(nested) {
 
 function buildColumnDraftBoard(teams, picks) {
   if (!Array.isArray(teams) || teams.length === 0) return [];
-  const totalRounds = 7;
+  const pickCount = Array.isArray(picks) ? picks.length : 0;
+  const totalRounds = Math.max(7, Math.ceil(pickCount / teams.length));
   const columns = teams.map((team) => ({
     team,
     rounds: Array.from({ length: totalRounds }, (_, idx) => ({
@@ -155,6 +156,11 @@ function TeamDetailModal({ team, onClose, onOpenBreakdown, onOpenHoles }) {
           <div>
             <div className="modalTitle">{team.teamName}</div>
             <div className="meta">Team total: {team.total ?? 0}</div>
+            {team.teamBonuses?.starterMadeCut?.total ? (
+              <div className="meta">
+                {team.teamBonuses.starterMadeCut.label}: {team.teamBonuses.starterMadeCut.count} × {team.teamBonuses.starterMadeCut.pointsEach} = {team.teamBonuses.starterMadeCut.total}
+              </div>
+            ) : null}
           </div>
           <button className="btn" onClick={onClose}>Close</button>
         </div>
@@ -337,6 +343,7 @@ export default function App() {
         total: data?.total || 0,
         players: Array.isArray(data?.players) ? data.players : [],
         missedStarterSlots: Array.isArray(data?.missedStarterSlots) ? data.missedStarterSlots : [],
+        teamBonuses: safeObject(data?.teamBonuses),
       }))
       .sort((a, b) => b.total - a.total);
   }, [scoreboard]);

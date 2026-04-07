@@ -21,6 +21,13 @@ BOGEY_FREE_ROUND_BONUS = 3.0
 UNDER_70_ROUND_BONUS = 5.0
 HOLE_IN_ONE_BONUS = 10.0
 
+STARTER_MADE_CUT_BONUS = 6.0
+TEAM_BONUS_META = {
+    "starter_made_cut": {
+        "label": "Starter Made Cut",
+        "pointsEach": STARTER_MADE_CUT_BONUS,
+    }
+}
 
 BASE_BREAKDOWN_META = {
     "albatross": {"label": "Albatross", "pointsEach": HOLE_POINTS["albatross"]},
@@ -493,6 +500,7 @@ def build_team_scoreboard(
 
         team_total = 0.0
         players_out: List[dict] = []
+        starters_made_cut_count = 0
 
         for slot_name, slot_label in SLOT_LABELS.items():
             player = roster.get(slot_name)
@@ -556,6 +564,8 @@ def build_team_scoreboard(
                 rounds_to_use = [1, 2, 3, 4] if sc.made_cut is True else ([1, 2] if sc.made_cut is False else [1, 2])
                 placement_points = sc.placement_bonus if sc.made_cut is True else 0.0
                 status = "missed_cut" if sc.made_cut is False else "starter"
+                if sc.made_cut is True:
+                    starters_made_cut_count += 1
 
             base_breakdown = aggregate_breakdowns_for_rounds(sc.round_base_breakdown, rounds_to_use)
             bonus_breakdown = aggregate_breakdowns_for_rounds(sc.round_bonus_breakdown, rounds_to_use)
@@ -601,10 +611,21 @@ def build_team_scoreboard(
                 }
             )
 
+        starter_cut_bonus_total = round(starters_made_cut_count * STARTER_MADE_CUT_BONUS, 2)
+        team_total = round(team_total + starter_cut_bonus_total, 2)
+
         teams_out[team] = {
-            "total": round(team_total, 2),
+            "total": team_total,
             "players": players_out,
             "missedStarterSlots": missed_starters,
+            "teamBonuses": {
+                "starterMadeCut": {
+                    "label": TEAM_BONUS_META["starter_made_cut"]["label"],
+                    "count": starters_made_cut_count,
+                    "pointsEach": TEAM_BONUS_META["starter_made_cut"]["pointsEach"],
+                    "total": starter_cut_bonus_total,
+                }
+            },
         }
 
     return teams_out

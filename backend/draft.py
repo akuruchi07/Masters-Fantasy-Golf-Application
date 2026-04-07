@@ -144,10 +144,12 @@ class DraftState:
         if not self.config.snake:
             self.team_index = (self.team_index + 1) % len(self.teams)
         else:
+            # True snake draft behavior repeats the end-team at each turn.
+            # Example for 3 teams: 0,1,2,2,1,0,0,1,2...
             nxt = self.team_index + self.direction
             if nxt < 0 or nxt >= len(self.teams):
                 self.direction *= -1
-                nxt = self.team_index + self.direction
+                nxt = self.team_index
             self.team_index = nxt
 
         self.deadline_ts = time.time() + self.config.seconds_per_pick

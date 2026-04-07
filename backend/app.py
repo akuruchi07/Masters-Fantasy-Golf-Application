@@ -537,7 +537,7 @@ async def auto_pick(req: AutoPickReq):
     if not d.started or d.completed:
         raise HTTPException(status_code=400, detail="Draft not active.")
     if d.current_team() != u.name:
-        raise HTTPException(status_code=403, detail=f"Not your turn. On the clock: {d.currentTeam()}")
+        raise HTTPException(status_code=403, detail=f"Not your turn. On the clock: {d.current_team()}")
 
     picked = do_auto_pick_for_team(u.name)
     if not picked:
