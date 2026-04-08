@@ -1320,3 +1320,16 @@ body {
   line-height: 1.35;
 }
 
+
+
+.picksAwayBubble {
+  border-color: rgba(212, 175, 55, 0.45);
+  background: rgba(212, 175, 55, 0.14);
+  color: #7a5d00;
+}
+
+.picksAwayNow {
+  border-color: rgba(31, 107, 67, 0.35);
+  background: rgba(31, 107, 67, 0.14);
+  color: var(--accent-strong);
+}

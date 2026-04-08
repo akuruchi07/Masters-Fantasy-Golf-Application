@@ -520,6 +520,29 @@ export default function App() {
   const onClock = draft?.currentTeam;
   const isMyTurn = !!me && draft?.started && !draft?.completed && onClock === me.name;
 
+  const picksUntilMyTurn = useMemo(() => {
+    if (!me || !draft?.started || draft?.completed) return null;
+    const teams = Array.isArray(draft?.teams) ? draft.teams : [];
+    const totalPicks = Number(draft?.totalPicks) || 0;
+    const currentPickNo = Number(draft?.pickNo) || 1;
+    if (!teams.length || !totalPicks) return null;
+
+    const order = [];
+    let direction = 1;
+    while (order.length < totalPicks) {
+      const roundTeams = direction === 1 ? teams : [...teams].reverse();
+      for (const team of roundTeams) {
+        if (order.length >= totalPicks) break;
+        order.push(team);
+      }
+      direction *= -1;
+    }
+
+    const nextIndex = order.findIndex((team, idx) => idx >= currentPickNo - 1 && team === me.name);
+    if (nextIndex === -1) return null;
+    return nextIndex - (currentPickNo - 1);
+  }, [me, draft]);
+
   const autoView = draft?.started && !draft?.completed ? "draft" : "dashboard";
   const activeView = viewMode === "auto" ? autoView : viewMode;
 
@@ -1048,6 +1071,17 @@ export default function App() {
                 <div className="pill">
                   {draft?.started ? (isMyTurn ? "Your turn" : `Waiting: ${onClock}`) : "Waiting for host"}
                 </div>
+                {draft?.started && !draft?.completed && me ? (
+                  <div className={`pill picksAwayBubble ${isMyTurn ? "picksAwayNow" : ""}`}>
+                    {isMyTurn
+                      ? "You are on the clock"
+                      : picksUntilMyTurn === 1
+                        ? "1 pick away"
+                        : typeof picksUntilMyTurn === "number"
+                          ? `${picksUntilMyTurn} picks away`
+                          : "Waiting for next turn"}
+                  </div>
+                ) : null}
                 {isMyTurn ? (
                   <button className="btn autoPickBtn" onClick={triggerAutoPick} disabled={autoPicking}>
                     {autoPicking ? "Auto Picking..." : "Auto Pick"}
@@ -1097,14 +1131,15 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="btn primary"
-                    onClick={() => draftPlayer(p)}
-                    disabled={!isMyTurn}
-                  >
-                    Draft
-                  </button>
+                  {isMyTurn ? (
+                    <button
+                      type="button"
+                      className="btn primary"
+                      onClick={() => draftPlayer(p)}
+                    >
+                      Draft
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>
