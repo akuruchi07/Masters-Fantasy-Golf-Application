@@ -1010,10 +1010,6 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                  <div className="playerCardRight">
-                    <div className="meta">Rank #{getPlayerRank(p) || "—"}</div>
-                    <div className="pill">{isMyTurn ? "Draft" : "View"}</div>
-                  </div>
                 </div>
               ))}
             </div>

@@ -426,6 +426,36 @@ def aggregate_breakdowns_for_rounds(round_breakdowns: Dict[int, Dict[str, dict]]
     return aggregated
 
 
+def assign_active_backups(
+    roster: Dict[str, Optional[dict]],
+    scorecards: Dict[str, LivePlayerScorecard],
+    missed_starters: List[str],
+) -> Dict[str, Optional[str]]:
+    """
+    Assign backups in backup-slot order to missed starters.
+
+    backup1 covers the first missed starter, backup2 covers the second. A backup only
+    becomes active if that backup made the cut. Backups never need to match the starter
+    category they are covering.
+    """
+    assignments: Dict[str, Optional[str]] = {}
+    for idx, backup_slot in enumerate(BACKUP_SLOTS):
+        covered_slot = missed_starters[idx] if idx < len(missed_starters) else None
+        if not covered_slot:
+            assignments[backup_slot] = None
+            continue
+
+        backup_player = roster.get(backup_slot)
+        if not backup_player:
+            assignments[backup_slot] = None
+            continue
+
+        backup_sc = scorecards.get(backup_player["athleteId"])
+        assignments[backup_slot] = covered_slot if backup_sc and backup_sc.made_cut is True else None
+
+    return assignments
+
+
 def get_leaderboard():
     data = fetch_espn_leaderboard()
     golfers = map_espn_field(data)
@@ -490,7 +520,7 @@ def build_team_scoreboard(
             if sc and sc.made_cut is False:
                 missed_starters.append(slot)
 
-        active_backups = set(BACKUP_SLOTS[: min(len(missed_starters), len(BACKUP_SLOTS))])
+        active_backup_assignments = assign_active_backups(roster, scorecards, missed_starters)
 
         team_total = 0.0
         players_out: List[dict] = []
@@ -523,7 +553,8 @@ def build_team_scoreboard(
 
             sc = scorecards.get(player["athleteId"])
             is_backup = slot_name in BACKUP_SLOTS
-            is_active_backup = slot_name in active_backups and bool(sc and sc.made_cut is True)
+            coveredStarterSlot = active_backup_assignments.get(slot_name) if is_backup else None
+            is_active_backup = bool(coveredStarterSlot)
 
             if not sc:
                 players_out.append(
@@ -540,7 +571,9 @@ def build_team_scoreboard(
                         "madeCut": None,
                         "isBackup": is_backup,
                         "isActive": is_active_backup or not is_backup,
-                        "status": "bench" if is_backup else "starter",
+                        "status": "active_backup" if is_active_backup else ("bench" if is_backup else "starter"),
+                        "coveredStarterSlot": coveredStarterSlot,
+                        "coveredStarterLabel": SLOT_LABELS.get(coveredStarterSlot) if coveredStarterSlot else None,
                         "scoringHighlights": [],
                         "baseBreakdown": {},
                         "bonusBreakdown": {},
@@ -595,6 +628,8 @@ def build_team_scoreboard(
                     "isBackup": is_backup,
                     "isActive": is_active_backup or not is_backup,
                     "status": status,
+                    "coveredStarterSlot": coveredStarterSlot if is_backup else None,
+                    "coveredStarterLabel": SLOT_LABELS.get(coveredStarterSlot) if is_backup and coveredStarterSlot else None,
                     "scoringHighlights": sc.scoring_highlights,
                     "baseBreakdown": base_breakdown,
                     "bonusBreakdown": bonus_breakdown,
@@ -614,6 +649,7 @@ def build_team_scoreboard(
             "total": team_total,
             "players": players_out,
             "missedStarterSlots": missed_starters,
+            "activeBackupAssignments": active_backup_assignments,
             "teamBonuses": {
                 "starterMadeCut": {
                     "label": "Starter made-cut bonus",
