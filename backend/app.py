@@ -181,7 +181,7 @@ AUTO_DRAFT_PRIORITY = [
     "min-woo-lee",        
     "justin-rose",
     "patrick-reed",    
-    "collin-morikawa"  
+    "collin-morikawa",  
     "si-woo-kim",      
     "jordan-spieth",
     "brooks-koepka",
