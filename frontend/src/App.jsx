@@ -209,7 +209,7 @@ function getRosterStatusDetails(playerRow, coveredByMap = {}) {
     const coveredLabel = playerRow.coveredStarterLabel || "starter slot";
     return {
       statusText: `Subbed in for ${coveredLabel}`,
-      detailText: "Weekend-only scoring (Rounds 3-4)",
+      detailText: "Weekend-only scoring (Rounds 3-4 + placement)",
       statusClass: "statusSubbedIn",
     };
   }
@@ -331,6 +331,8 @@ export default function App() {
   const userId = useMemo(() => getOrCreateUserId(), []);
   const [name, setName] = useState(localStorage.getItem("masters_name") || "");
   const [joined, setJoined] = useState(false);
+  const [spectatorMode, setSpectatorMode] = useState(false);
+  const [bootstrapped, setBootstrapped] = useState(false);
 
   const [field, setField] = useState([]);
   const [room, setRoom] = useState(null);
@@ -374,27 +376,56 @@ export default function App() {
   }, [draft?.started, draft?.completed, draft?.deadlineTs, draft?.secondsLeft]);
 
   useEffect(() => {
-    if (!joined) return;
-
-    let intervalId;
+    let cancelled = false;
 
     (async () => {
       try {
-        const f = await api.field(0);
+        const [f, s, sb, lb] = await Promise.all([
+          api.field(0),
+          api.state(),
+          api.scoreboard(),
+          api.tournamentLeaderboard(),
+        ]);
+        if (cancelled) return;
         setField(Array.isArray(f?.players) ? f.players : []);
-        const s = await api.state();
         setRoom(s);
-        const sb = await api.scoreboard();
         setScoreboard(sb);
-        const lb = await api.tournamentLeaderboard();
         setTournamentLeaderboard(Array.isArray(lb?.leaderboard) ? lb.leaderboard : []);
+
+        const knownUser = Array.isArray(s?.users) ? s.users.find((u) => u.userId === userId) : null;
+        if (knownUser) {
+          setJoined(true);
+          setSpectatorMode(false);
+          if (knownUser?.name) {
+            setName(knownUser.name);
+            localStorage.setItem("masters_name", knownUser.name);
+          }
+        } else if (s?.draft?.started || s?.draft?.completed) {
+          setJoined(true);
+          setSpectatorMode(true);
+        } else {
+          setJoined(false);
+          setSpectatorMode(false);
+        }
       } catch (e) {
-        console.error("initial load failed:", e);
-        setError(e.message || "Failed to load app data.");
+        if (!cancelled) {
+          console.error("initial load failed:", e);
+          setError(e.message || "Failed to load app data.");
+        }
+      } finally {
+        if (!cancelled) setBootstrapped(true);
       }
     })();
 
-    intervalId = setInterval(async () => {
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!joined || !bootstrapped) return;
+
+    const intervalId = setInterval(async () => {
       try {
         const lb = await api.tournamentLeaderboard();
         setTournamentLeaderboard(Array.isArray(lb?.leaderboard) ? lb.leaderboard : []);
@@ -413,7 +444,7 @@ export default function App() {
       clearInterval(intervalId);
       ws.close();
     };
-  }, [joined, userId]);
+  }, [joined, bootstrapped, userId]);
 
   const me = useMemo(() => {
     const users = Array.isArray(room?.users) ? room.users : [];
@@ -507,6 +538,7 @@ export default function App() {
     try {
       await api.join(userId, nm);
       setJoined(true);
+      setSpectatorMode(false);
     } catch (e) {
       setError(e.message);
     }
@@ -1106,6 +1138,17 @@ export default function App() {
     );
   }
 
+  if (!bootstrapped) {
+    return (
+      <div className="page">
+        <div className="card" style={{ maxWidth: 520, margin: "80px auto" }}>
+          <h1 style={{ marginTop: 0 }} className="h2">Loading…</h1>
+          <p className="meta">Checking your draft session.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!joined) {
     return (
       <div className="page">
@@ -1156,7 +1199,7 @@ export default function App() {
           </div>
 
           <div className="muted">
-            You are: <b>{me?.name || "…"}</b> {me?.isHost ? <span className="pillHost">HOST</span> : null}
+            You are: <b>{me?.name || (spectatorMode ? "Spectator" : "…")}</b> {me?.isHost ? <span className="pillHost">HOST</span> : spectatorMode ? <span className="pill">SPECTATOR</span> : null}
             {" • "}
             {draft?.started
               ? draft.completed

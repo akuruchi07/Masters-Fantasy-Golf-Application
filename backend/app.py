@@ -541,9 +541,12 @@ def state():
 @app.post("/api/join")
 async def join(req: JoinReq):
     nm = (req.name or "").strip()[:30] or "Player"
-    if req.userId in ROOM.users:
-        ROOM.users[req.userId].name = nm
+    existing = ROOM.users.get(req.userId)
+    if existing:
+        existing.name = nm
     else:
+        if ROOM.draft.started or ROOM.draft.completed:
+            raise HTTPException(status_code=403, detail="Draft already started. New visitors can join as spectators only.")
         ROOM.users[req.userId] = User(user_id=req.userId, name=nm)
 
     if ROOM.host_id() is None:
