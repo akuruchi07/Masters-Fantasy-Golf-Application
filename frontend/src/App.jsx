@@ -53,6 +53,30 @@ function playerQualifiesForSlot(player, slot) {
   return false;
 }
 
+function PlayerAvatar({ player, className = "playerAvatar" }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const initials = player?.initials || (player?.name || "?").split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase();
+
+  if (!player?.avatarUrl || imgFailed) {
+    return (
+      <div className={`${className} avatarFallback`} aria-label={player?.name || "Player avatar"}>
+        <span>{initials}</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      className={className}
+      src={player.avatarUrl}
+      alt={player?.name || "Player headshot"}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setImgFailed(true)}
+    />
+  );
+}
+
 function ScoreBreakdown({ basePoints = 0, bonusPoints = 0, placementBonus = 0, onOpenBreakdown }) {
   const hasPlacement = Number(placementBonus) !== 0;
 
@@ -164,6 +188,9 @@ function TeamDetailModal({ team, onClose, onOpenBreakdown, onOpenHoles }) {
           <div>
             <div className="modalTitle">{team.teamName}</div>
             <div className="meta">Team total: {team.total ?? 0}</div>
+            {team?.teamBonuses?.starterMadeCut?.total ? (
+              <div className="meta">Starter made-cut bonus: +{team.teamBonuses.starterMadeCut.total}</div>
+            ) : null}
           </div>
           <button className="btn" onClick={onClose}>Close</button>
         </div>
@@ -339,15 +366,6 @@ export default function App() {
   const suggestionTeamName = draft?.started && !draft?.completed ? draft?.currentTeam : me?.name;
   const suggestionRoster = safeObject(draft?.rosters?.[suggestionTeamName]?.slots);
   const suggestionNeededStarterSlots = starterSlots.filter((slot) => !suggestionRoster?.[slot]);
-
-  const available = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return (Array.isArray(field) ? field : [])
-      .filter((p) => !picked.has(p.athleteId))
-      .filter((p) => playerMatchesFilter(p, categoryFilter))
-      .filter((p) => (q ? (p?.name || "").toLowerCase().includes(q) : true));
-  }, [field, picked, query, categoryFilter]);
-
   const bestAvailable = useMemo(() => {
     const sorted = [...available].sort((a, b) => (a?.oddsRank || 9999) - (b?.oddsRank || 9999));
     if (!suggestionTeamName) return sorted.slice(0, 6);
@@ -371,6 +389,14 @@ export default function App() {
     return preferred.slice(0, 6);
   }, [available, suggestionNeededStarterSlots, suggestionTeamName]);
 
+  const available = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (Array.isArray(field) ? field : [])
+      .filter((p) => !picked.has(p.athleteId))
+      .filter((p) => playerMatchesFilter(p, categoryFilter))
+      .filter((p) => (q ? (p?.name || "").toLowerCase().includes(q) : true));
+  }, [field, picked, query, categoryFilter]);
+
   const leagueStandings = useMemo(() => {
     const teamsObj = safeObject(scoreboard?.teams);
     return Object.entries(teamsObj)
@@ -379,6 +405,7 @@ export default function App() {
         total: data?.total || 0,
         players: Array.isArray(data?.players) ? data.players : [],
         missedStarterSlots: Array.isArray(data?.missedStarterSlots) ? data.missedStarterSlots : [],
+        teamBonuses: safeObject(data?.teamBonuses),
       }))
       .sort((a, b) => b.total - a.total);
   }, [scoreboard]);
@@ -711,63 +738,161 @@ export default function App() {
 
   function renderRulesView() {
     const starterBonus = 6;
+    const holeRules = [
+      ["Albatross", "+20"],
+      ["Eagle", "+8"],
+      ["Birdie", "+3"],
+      ["Par", "+0.5"],
+      ["Bogey", "-0.5"],
+      ["Double bogey or worse", "-1"],
+    ];
+    const placementRules = [
+      ["1st", "+30"],
+      ["2nd", "+20"],
+      ["3rd", "+18"],
+      ["4th", "+16"],
+      ["5th", "+14"],
+      ["6th–10th", "+10"],
+      ["11th–15th", "+8"],
+      ["16th–20th", "+6"],
+      ["21st–25th", "+4"],
+    ];
+
     return (
       <div className="rulesLayout">
         <section className="card rulesHeroCard">
           <div className="dashboardEyebrow">Masters Weekend Pool</div>
           <h2 className="dashboardTitle">Rules & Scoring</h2>
           <p className="rulesIntro">
-            Every roster has 7 spots: 5 starters and 2 backups. The draft runs as a snake draft, starters must be filled before backups,
-            and only starters earn the made-cut team bonus.
+            This page is the full league guide: roster construction, snake draft flow, how backups work, the exact
+            hole-by-hole scoring system, placement bonuses, cut handling, and the starter-only made-cut team bonus.
           </p>
         </section>
 
         <section className="card rulesSection">
-          <h3 className="rulesSectionTitle">Roster Build</h3>
+          <h3 className="rulesSectionTitle">Roster build</h3>
           <div className="rulesGrid">
             {starterSlots.map((slot) => (
               <div key={slot} className="rulePillCard">
                 <div className="ruleLabel">Starter</div>
                 <div className="ruleValue">{slotLabels[slot] || slot}</div>
+                <div className="ruleHelper">Must be filled before either backup slot can be drafted.</div>
               </div>
             ))}
             {(Array.isArray(draft?.backupSlots) ? draft.backupSlots : []).map((slot) => (
               <div key={slot} className="rulePillCard">
                 <div className="ruleLabel">Backup</div>
                 <div className="ruleValue">{slotLabels[slot] || slot}</div>
+                <div className="ruleHelper">Bench coverage for the weekend if a starter misses the cut.</div>
               </div>
             ))}
           </div>
         </section>
 
         <section className="card rulesSection">
-          <h3 className="rulesSectionTitle">Draft Rules</h3>
+          <h3 className="rulesSectionTitle">Draft rules</h3>
           <ul className="rulesList">
-            <li>The host randomizes the draft order when the draft starts.</li>
-            <li>The draft is a true snake: 1 → N in round 1, then N → 1 in round 2.</li>
-            <li>You must fill all 5 starter categories before you can draft Backup 1 or Backup 2.</li>
-            <li>Auto draft follows the odds-based board and fills the earliest valid open slot.</li>
-            <li>No golfer can be drafted twice anywhere in the room.</li>
+            <li>The host starts the room and the draft order is randomized once the draft begins.</li>
+            <li>The draft is a true snake draft: round 1 goes 1 → N, round 2 goes N → 1, and that pattern repeats.</li>
+            <li>You must fill all 5 starter categories before Backup 1 or Backup 2 can be selected.</li>
+            <li>No golfer can be drafted by more than one team.</li>
+            <li>If a player qualifies for multiple starter categories, the drafter must choose which open slot to place them in.</li>
+            <li>Auto draft uses the odds board and fills the highest-priority valid open slot for that roster.</li>
+            <li>The current team on the clock is marked on the draft board and in the lobby panel.</li>
           </ul>
         </section>
 
         <section className="card rulesSection">
-          <h3 className="rulesSectionTitle">Scoring Summary</h3>
+          <h3 className="rulesSectionTitle">Exact hole-by-hole scoring</h3>
+          <div className="rulesTableWrap">
+            <table className="rulesTable">
+              <thead>
+                <tr><th>Hole result</th><th>Fantasy points</th></tr>
+              </thead>
+              <tbody>
+                {holeRules.map(([label, pts]) => (
+                  <tr key={label}>
+                    <td>{label}</td>
+                    <td>{pts}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="rulesSubgrid">
+            <div className="rulePillCard">
+              <div className="ruleLabel">Bonus</div>
+              <div className="ruleValue">Hole-in-one: +10</div>
+              <div className="ruleHelper">Added on top of the base points from that hole.</div>
+            </div>
+            <div className="rulePillCard">
+              <div className="ruleLabel">Bonus</div>
+              <div className="ruleValue">3 birdies in a row: +3</div>
+              <div className="ruleHelper">Awarded each time a golfer completes a fresh three-birdie streak.</div>
+            </div>
+            <div className="rulePillCard">
+              <div className="ruleLabel">Bonus</div>
+              <div className="ruleValue">Bogey-free round: +3</div>
+              <div className="ruleHelper">A full round with no bogey or worse.</div>
+            </div>
+            <div className="rulePillCard">
+              <div className="ruleLabel">Bonus</div>
+              <div className="ruleValue">Under 70 round: +5</div>
+              <div className="ruleHelper">Applies to any completed round of 69 or better.</div>
+            </div>
+          </div>
+        </section>
+
+        <section className="card rulesSection">
+          <h3 className="rulesSectionTitle">Tournament finish bonus</h3>
+          <div className="rulesTableWrap">
+            <table className="rulesTable">
+              <thead>
+                <tr><th>Finish</th><th>Fantasy points</th></tr>
+              </thead>
+              <tbody>
+                {placementRules.map(([place, pts]) => (
+                  <tr key={place}>
+                    <td>{place}</td>
+                    <td>{pts}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="ruleHelper ruleHelperBlock">
+            Placement bonus is only counted for golfers who make the cut and finish inside the paid finishing bands above.
+          </p>
+        </section>
+
+        <section className="card rulesSection">
+          <h3 className="rulesSectionTitle">Cut rules and backups</h3>
           <ul className="rulesList">
-            <li>Hole-by-hole fantasy points still drive most of the scoring.</li>
-            <li>Placement bonuses still reward golfers who finish near the top of the Masters leaderboard.</li>
-            <li>Each starter who makes the cut adds a <strong>+{starterBonus}</strong> team bonus.</li>
-            <li>Backups can replace missed-cut starters in scoring, but backups do <strong>not</strong> earn the made-cut team bonus.</li>
-            <li>That keeps strong drafting valuable while still letting smart backup coverage stay competitive.</li>
+            <li>Starters always score rounds 1 and 2.</li>
+            <li>If a starter misses the cut, that starter keeps only rounds 1 and 2 plus any bonuses earned before the cut.</li>
+            <li>Backups do not score by default.</li>
+            <li>If a starter misses the cut, an eligible backup can become active for weekend scoring and contribute rounds 3 and 4 instead.</li>
+            <li>Backups can still help a team win, but they do not erase the early-round loss from a missed-cut starter.</li>
           </ul>
         </section>
 
         <section className="card rulesSection">
-          <h3 className="rulesSectionTitle">Category Notes</h3>
+          <h3 className="rulesSectionTitle">Starter-only team bonus</h3>
           <ul className="rulesList">
-            <li>Nationality tags were rechecked against the official 2026 Masters player listings.</li>
-            <li>Patrick Reed is treated as American on the draft board.</li>
-            <li>The non-PGA bucket is reserved for players currently outside the PGA Tour lane used by the app.</li>
+            <li>Each starter who makes the cut adds <strong>+{starterBonus}</strong> team points.</li>
+            <li>This bonus applies only to the 5 starter slots.</li>
+            <li>Backups do not receive made-cut team bonus points, even if they become active on the weekend.</li>
+            <li>That keeps strong drafting valuable while still preserving comeback paths through backup coverage.</li>
+          </ul>
+        </section>
+
+        <section className="card rulesSection">
+          <h3 className="rulesSectionTitle">Player categories</h3>
+          <ul className="rulesList">
+            <li>Category labels come from the official Masters player listing and the current category rules used by this pool.</li>
+            <li>Patrick Reed is treated as American.</li>
+            <li>The filter chips in the draft room turn red when a required starter category is still empty on your roster.</li>
+            <li>Once all 5 starter categories are filled, the backups are effectively unlocked.</li>
           </ul>
         </section>
       </div>
@@ -865,7 +990,7 @@ export default function App() {
                   title={isMyTurn ? "Click to draft" : "Not your turn"}
                 >
                   <div className="playerCardLeft">
-                    <img className="playerAvatar" src={p.avatarUrl} alt={p.name} />
+                    <PlayerAvatar player={p} className="playerAvatar" />
                     <div>
                       <div className="playerNameRow">
                         <div className="name">{p.name}</div>
@@ -896,7 +1021,7 @@ export default function App() {
               <div className="bestAvailableList">
                 {bestAvailable.map((player) => (
                   <button key={player.athleteId} className="bestAvailableCard" onClick={() => isMyTurn && draftPlayer(player)}>
-                    <img className="bestAvailableAvatar" src={player.avatarUrl} alt={player.name} />
+                    <PlayerAvatar player={player} className="bestAvailableAvatar" />
                     <div className="bestAvailableBody">
                       <div className="bestAvailableTop">
                         <span className="name">{player.name}</span>
