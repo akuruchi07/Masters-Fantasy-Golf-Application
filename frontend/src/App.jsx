@@ -51,6 +51,15 @@ function playerQualifiesForSlot(player, slot) {
   return false;
 }
 
+
+
+function getPlayerRank(player) {
+  const value = player?.rank ?? player?.oddsRank ?? player?.ranking ?? player?.seed ?? null;
+  if (value == null || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : value;
+}
+
 function PlayerAvatar({ player, className = "playerAvatar" }) {
   const [imgFailed, setImgFailed] = useState(false);
   const initials = player?.initials || (player?.name || "?").split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase();
@@ -373,7 +382,7 @@ export default function App() {
   }, [field, picked, query, categoryFilter]);
 
   const bestAvailable = useMemo(() => {
-    const sorted = [...available].sort((a, b) => (a?.rank || 9999) - (b?.rank || 9999));
+    const sorted = [...available].sort((a, b) => (getPlayerRank(a) || 9999) - (getPlayerRank(b) || 9999));
     if (!suggestionTeamName) return sorted.slice(0, 6);
 
     const preferred = [];
@@ -992,7 +1001,7 @@ export default function App() {
                     <div>
                       <div className="playerNameRow">
                         <div className="name">{p.name}</div>
-                        <span className="oddsBadge">#{p.rank || "—"}</span>
+                        <span className="oddsBadge">#{getPlayerRank(p) || "—"}</span>
                       </div>
                       <div className="tagRow">
                         {getCategoryTags(p).map((tag) => (
@@ -1002,7 +1011,7 @@ export default function App() {
                     </div>
                   </div>
                   <div className="playerCardRight">
-                    <div className="meta">Rank #{p.rank || "—"}</div>
+                    <div className="meta">Rank #{getPlayerRank(p) || "—"}</div>
                     <div className="pill">{isMyTurn ? "Draft" : "View"}</div>
                   </div>
                 </div>
@@ -1023,7 +1032,7 @@ export default function App() {
                     <div className="bestAvailableBody">
                       <div className="bestAvailableTop">
                         <span className="name">{player.name}</span>
-                        <span className="oddsBadge">#{player.rank || "—"}</span>
+                        <span className="oddsBadge">#{getPlayerRank(player) || "—"}</span>
                       </div>
                       <div className="meta">Best fit: {player.suggestedSlot ? (slotLabels[player.suggestedSlot] || player.suggestedSlot) : "Best available overall"}</div>
                     </div>
