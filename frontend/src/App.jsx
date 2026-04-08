@@ -1082,12 +1082,7 @@ export default function App() {
 
             <div className="list playerPoolList">
               {available.map((p) => (
-                <div
-                  className={`playerCard ${isMyTurn ? "clickable" : ""}`}
-                  key={p.athleteId}
-                  onClick={() => isMyTurn && draftPlayer(p)}
-                  title={isMyTurn ? "Click to draft" : "Not your turn"}
-                >
+                <div className="playerCard" key={p.athleteId} title={isMyTurn ? "Use the Draft button to pick this player" : "Not your turn"}>
                   <div className="playerCardLeft">
                     <PlayerAvatar player={p} className="playerAvatar" />
                     <div>
@@ -1102,6 +1097,14 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    className="btn primary"
+                    onClick={() => draftPlayer(p)}
+                    disabled={!isMyTurn}
+                  >
+                    Draft
+                  </button>
                 </div>
               ))}
             </div>
