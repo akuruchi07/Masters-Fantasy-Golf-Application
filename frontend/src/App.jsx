@@ -209,7 +209,7 @@ function getRosterStatusDetails(playerRow, coveredByMap = {}) {
     const coveredLabel = playerRow.coveredStarterLabel || "starter slot";
     return {
       statusText: `Subbed in for ${coveredLabel}`,
-      detailText: "Weekend-only scoring (Rounds 3-4 + placement)",
+      detailText: "Weekend-only scoring (Rounds 3-4)",
       statusClass: "statusSubbedIn",
     };
   }
