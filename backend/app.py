@@ -403,11 +403,11 @@ def seed_room_from_saved_state():
 
     # Pooby gets Holtz, Kataoka, Pulcini
     if "Pooby" in d.rosters:
-        d.rosters["Pooby"]["past_champion"] = player_meta_from_name("Brandon Holtz") | {
+        d.rosters["Pooby"]["past_champion"] = player_meta_from_name("Naoyuki Kataoka") | {
             "slot": "past_champion",
             "slotLabel": SLOT_LABELS["past_champion"],
         }
-        d.rosters["Pooby"]["backup_1"] = player_meta_from_name("Naoyuki Kataoka") | {
+        d.rosters["Pooby"]["backup_1"] = player_meta_from_name("Brandon Holtz") | {
             "slot": "backup_1",
             "slotLabel": SLOT_LABELS["backup_1"],
         }
