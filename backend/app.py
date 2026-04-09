@@ -308,7 +308,7 @@ scorecards: Dict[str, LivePlayerScorecard] = {}
 
 
 @dataclass
-class User:
+class User(BaseModel):
     user_id: str
     name: str
     is_host: bool = False
@@ -428,7 +428,7 @@ async def broadcast(msg: Dict[str, Any]):
 
 
 def serialize_room_state() -> Dict[str, Any]:
-    users = [{"userId": u.user_id, "name": u.name, "isHost": u.is_host, "spectator": u.spectator} for u in ROOM.users.values()]
+    users = [{"userId": u.user_id, "name": u.name, "isHost": u.is_host, "spectator": getattr(u, "spectator", False),} for u in ROOM.users.values()]
     users.sort(key=lambda x: (not x["isHost"], x["name"].lower()))
 
     d = ROOM.draft
@@ -629,24 +629,26 @@ def state():
 
 @app.post("/api/join")
 async def join(req: JoinReq):
-    nm = (req.name or "").strip()[:30] or "Spectator"
+    requested_name = (req.name or "").strip()[:30]
     existing = ROOM.users.get(req.userId)
 
     if existing:
-        # Keep existing role; just refresh the display name
-        existing.name = nm if nm else existing.name
+        if requested_name:
+            existing.name = requested_name
     else:
         if ROOM.draft.started or ROOM.draft.completed:
             ROOM.users[req.userId] = User(
                 user_id=req.userId,
-                name=nm,
+                name=requested_name or "Spectator",
                 is_host=False,
                 spectator=True,
             )
         else:
             ROOM.users[req.userId] = User(
                 user_id=req.userId,
-                name=nm if nm != "Spectator" else "Player",
+                name=requested_name or "Player",
+                is_host=False,
+                spectator=False,
             )
 
     if ROOM.host_id() is None and not ROOM.users[req.userId].spectator:
