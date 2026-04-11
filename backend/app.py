@@ -415,6 +415,13 @@ def seed_room_from_saved_state():
             "slot": "backup_2",
             "slotLabel": SLOT_LABELS["backup_2"],
         }
+    
+    # Fixed Naming error for julian
+    if "jububi" in d.rosters:
+        d.rosters["jububi"]["wildcard"] = player_meta_from_name("Sam Stevens") | {
+            "slot": "wildcard",
+            "slotLabel": SLOT_LABELS["wildcard"],
+        }
 
     # rebuild picked ids so the 6 manually-added players are marked unavailable
     rebuilt = set()
@@ -647,7 +654,17 @@ async def join(req: JoinReq):
         if requested_name:
             existing.name = requested_name
     else:
-        if ROOM.draft.started or ROOM.draft.completed:
+        drafted_team_names = set(ROOM.draft.teams or [])
+
+        # If this name matches an existing drafted team, let them claim that team
+        if requested_name and requested_name in drafted_team_names:
+            ROOM.users[req.userId] = User(
+                user_id=req.userId,
+                name=requested_name,
+                is_host=False,
+                spectator=False,
+            )
+        elif ROOM.draft.started or ROOM.draft.completed:
             ROOM.users[req.userId] = User(
                 user_id=req.userId,
                 name=requested_name or "Spectator",
