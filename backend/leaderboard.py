@@ -29,12 +29,21 @@ BASE_BREAKDOWN_META = {
     "birdie": {"label": "Birdie", "pointsEach": HOLE_POINTS["birdie"]},
     "par": {"label": "Par", "pointsEach": HOLE_POINTS["par"]},
     "bogey": {"label": "Bogey", "pointsEach": HOLE_POINTS["bogey"]},
-    "double_bogey_or_worse": {"label": "Double Bogey or Worse", "pointsEach": HOLE_POINTS["double_bogey"]},
+    "double_bogey_or_worse": {
+        "label": "Double Bogey or Worse",
+        "pointsEach": HOLE_POINTS["double_bogey"],
+    },
 }
 
 BONUS_BREAKDOWN_META = {
-    "three_birdies_streak": {"label": "3 Birdies in a Row", "pointsEach": THREE_BIRDIES_STREAK_BONUS},
-    "bogey_free_round": {"label": "Bogey-Free Round", "pointsEach": BOGEY_FREE_ROUND_BONUS},
+    "three_birdies_streak": {
+        "label": "3 Birdies in a Row",
+        "pointsEach": THREE_BIRDIES_STREAK_BONUS,
+    },
+    "bogey_free_round": {
+        "label": "Bogey-Free Round",
+        "pointsEach": BOGEY_FREE_ROUND_BONUS,
+    },
     "under_70_round": {"label": "Under 70 Round", "pointsEach": UNDER_70_ROUND_BONUS},
     "hole_in_one": {"label": "Hole-in-One", "pointsEach": HOLE_IN_ONE_BONUS},
 }
@@ -118,31 +127,24 @@ def points_for_result(result: str) -> float:
     return HOLE_POINTS.get(result, 0.0)
 
 
-def infer_made_cut(raw_golfer: dict) -> Optional[bool]:
-    status = (raw_golfer.get("status") or {}).get("type", {}) if isinstance(raw_golfer.get("status"), dict) else {}
-    status_name = str(status.get("name") or "").lower()
-    status_state = str(status.get("state") or "").lower()
-    detail = str(status.get("detail") or "").lower()
-
+def infer_made_cut(
+    raw_golfer: dict, round_3_started_for_field: bool = False
+) -> Optional[bool]:
     rounds = raw_golfer.get("rounds") or []
-    rounds_completed = sum(1 for rnd in rounds if any(h.get("strokes") is not None for h in rnd))
 
-    if "made cut" in detail:
+    played_rounds = sum(
+        1 for rnd in rounds if any(h.get("strokes") is not None for h in rnd)
+    )
+
+    this_player_started_round_3 = len(rounds) >= 3 and any(
+        h.get("strokes") is not None for h in rounds[2]
+    )
+
+    if this_player_started_round_3:
         return True
-    if "missed cut" in detail or (("cut" in detail) and ("made" not in detail)):
-        return False
-    if status_name in {"cut", "missed_cut"}:
-        return False
-    if rounds_completed >= 3:
-        return True
 
-    # Before the cut is official after Friday, treat as unknown.
-    if rounds_completed < 2:
-        return None
-
-    # If exactly two rounds are complete but no explicit cut result, still unknown.
-    if rounds_completed == 2 and status_state not in {"post", "complete"}:
-        return None
+    if round_3_started_for_field and played_rounds == 2:
+        return False
 
     return None
 
@@ -183,7 +185,9 @@ def parse_position_value(raw_golfer: dict) -> Optional[int]:
 
 
 def round_complete(holes: List[dict]) -> bool:
-    played = [h for h in holes if h.get("strokes") is not None and h.get("par") is not None]
+    played = [
+        h for h in holes if h.get("strokes") is not None and h.get("par") is not None
+    ]
     return len(played) >= 18
 
 
@@ -197,6 +201,15 @@ def empty_base_breakdown():
         }
         for key, value in BASE_BREAKDOWN_META.items()
     }
+
+
+# Helper for cut function
+def field_has_started_round_3(golfers: List[dict]) -> bool:
+    for g in golfers:
+        rounds = g.get("rounds") or []
+        if len(rounds) >= 3 and any(h.get("strokes") is not None for h in rounds[2]):
+            return True
+    return False
 
 
 def empty_bonus_breakdown():
@@ -224,7 +237,9 @@ def add_breakdown_dicts(target: Dict[str, dict], source: Dict[str, dict]):
         target[key]["total"] = round(target[key]["total"] + src.get("total", 0.0), 2)
 
 
-def build_hole_scores(rounds: List[List[dict]]) -> Tuple[List[HoleScore], Dict[int, List[HoleScore]], Dict[int, Dict[str, dict]]]:
+def build_hole_scores(
+    rounds: List[List[dict]],
+) -> Tuple[List[HoleScore], Dict[int, List[HoleScore]], Dict[int, Dict[str, dict]]]:
     holes_out: List[HoleScore] = []
     grouped: Dict[int, List[HoleScore]] = {}
     round_base_breakdown: Dict[int, Dict[str, dict]] = {}
@@ -259,7 +274,11 @@ def build_hole_scores(rounds: List[List[dict]]) -> Tuple[List[HoleScore], Dict[i
             holes_out.append(hs)
             grouped[round_index].append(hs)
 
-            key = "double_bogey_or_worse" if result in {"double_bogey", "worse"} else result
+            key = (
+                "double_bogey_or_worse"
+                if result in {"double_bogey", "worse"}
+                else result
+            )
             round_base_breakdown[round_index][key]["count"] += 1
             round_base_breakdown[round_index][key]["total"] = round(
                 round_base_breakdown[round_index][key]["total"] + base_points, 2
@@ -268,7 +287,9 @@ def build_hole_scores(rounds: List[List[dict]]) -> Tuple[List[HoleScore], Dict[i
     return holes_out, grouped, round_base_breakdown
 
 
-def compute_round_bonuses(round_num: int, holes: List[HoleScore]) -> Tuple[float, List[str], Dict[str, dict]]:
+def compute_round_bonuses(
+    round_num: int, holes: List[HoleScore]
+) -> Tuple[float, List[str], Dict[str, dict]]:
     if not holes:
         return 0.0, [], empty_bonus_breakdown()
 
@@ -281,8 +302,12 @@ def compute_round_bonuses(round_num: int, holes: List[HoleScore]) -> Tuple[float
         ace_total = sum(h.bonus_points for h in holes if h.bonus_points > 0)
         bonus += ace_total
         breakdown["hole_in_one"]["count"] += ace_count
-        breakdown["hole_in_one"]["total"] = round(breakdown["hole_in_one"]["total"] + ace_total, 2)
-        highlights.append(f"{ace_count} Hole-in-One" if ace_count > 1 else "Hole-in-One")
+        breakdown["hole_in_one"]["total"] = round(
+            breakdown["hole_in_one"]["total"] + ace_total, 2
+        )
+        highlights.append(
+            f"{ace_count} Hole-in-One" if ace_count > 1 else "Hole-in-One"
+        )
 
     streak = 0
     streak_awarded = False
@@ -301,9 +326,15 @@ def compute_round_bonuses(round_num: int, holes: List[HoleScore]) -> Tuple[float
     if streak_count:
         breakdown["three_birdies_streak"]["count"] += streak_count
         breakdown["three_birdies_streak"]["total"] = round(
-            breakdown["three_birdies_streak"]["total"] + streak_count * THREE_BIRDIES_STREAK_BONUS, 2
+            breakdown["three_birdies_streak"]["total"]
+            + streak_count * THREE_BIRDIES_STREAK_BONUS,
+            2,
         )
-        highlights.append(f"{streak_count} Birdie Streak Bonus" if streak_count > 1 else "Birdie Streak Bonus")
+        highlights.append(
+            f"{streak_count} Birdie Streak Bonus"
+            if streak_count > 1
+            else "Birdie Streak Bonus"
+        )
 
     if round_complete([{"strokes": h.strokes, "par": h.par} for h in holes]):
         if all(h.result not in {"bogey", "double_bogey", "worse"} for h in holes):
@@ -326,7 +357,13 @@ def compute_round_bonuses(round_num: int, holes: List[HoleScore]) -> Tuple[float
     return round(bonus, 2), highlights, breakdown
 
 
-def score_one_golfer(raw_golfer: dict, placement_points: float = 0.0, rank: Optional[int] = None) -> LivePlayerScorecard:
+def score_one_golfer(
+    raw_golfer: dict,
+    placement_points: float = 0.0,
+    rank: Optional[int] = None,
+    round_3_started_for_field: bool = False,
+) -> LivePlayerScorecard:
+    
     athlete_id = slugify(raw_golfer["name"])
     rounds = raw_golfer.get("rounds") or []
 
@@ -340,7 +377,9 @@ def score_one_golfer(raw_golfer: dict, placement_points: float = 0.0, rank: Opti
 
     for round_num, round_holes in holes_by_round.items():
         hole_points = round(sum(h.points for h in round_holes), 2)
-        bonus_points, round_highlights, bonus_breakdown = compute_round_bonuses(round_num, round_holes)
+        bonus_points, round_highlights, bonus_breakdown = compute_round_bonuses(
+            round_num, round_holes
+        )
 
         round_hole_points[round_num] = hole_points
         round_bonus_points[round_num] = round(bonus_points, 2)
@@ -371,7 +410,7 @@ def score_one_golfer(raw_golfer: dict, placement_points: float = 0.0, rank: Opti
         fantasy_points=total_points,
         holes=holes,
         updated_ts=time.time(),
-        made_cut=infer_made_cut(raw_golfer),
+        made_cut=infer_made_cut(raw_golfer, round_3_started_for_field),
         round_points=round_points,
         round_hole_points=round_hole_points,
         round_bonus_points=round_bonus_points,
@@ -393,18 +432,30 @@ def all_positions_final(golfers: List[dict]) -> bool:
     finished_count = 0
     for g in golfers:
         cut_status = infer_made_cut(g)
-        status = (g.get("status") or {}).get("type", {}) if isinstance(g.get("status"), dict) else {}
+        status = (
+            (g.get("status") or {}).get("type", {})
+            if isinstance(g.get("status"), dict)
+            else {}
+        )
         state = str(status.get("state") or "").lower()
         rounds = g.get("rounds") or []
-        rounds_completed = sum(1 for rnd in rounds if any(h.get("strokes") is not None for h in rnd))
+        rounds_completed = sum(
+            1 for rnd in rounds if any(h.get("strokes") is not None for h in rnd)
+        )
 
-        if state in {"post", "complete"} or rounds_completed >= 4 or cut_status is False:
+        if (
+            state in {"post", "complete"}
+            or rounds_completed >= 4
+            or cut_status is False
+        ):
             finished_count += 1
 
     return finished_count == len(golfers)
 
 
-def aggregate_breakdowns_for_rounds(round_breakdowns: Dict[int, Dict[str, dict]], rounds_to_use: List[int]) -> Dict[str, dict]:
+def aggregate_breakdowns_for_rounds(
+    round_breakdowns: Dict[int, Dict[str, dict]], rounds_to_use: List[int]
+) -> Dict[str, dict]:
     if not round_breakdowns:
         return {}
 
@@ -451,7 +502,9 @@ def assign_active_backups(
             continue
 
         backup_sc = scorecards.get(backup_player["athleteId"])
-        assignments[backup_slot] = covered_slot if backup_sc and backup_sc.made_cut is True else None
+        assignments[backup_slot] = (
+            covered_slot if backup_sc and backup_sc.made_cut is True else None
+        )
 
     return assignments
 
@@ -459,6 +512,7 @@ def assign_active_backups(
 def get_leaderboard():
     data = fetch_espn_leaderboard()
     golfers = map_espn_field(data)
+    round_3_started_for_field = field_has_started_round_3(golfers)
 
     apply_placement = all_positions_final(golfers)
 
@@ -466,7 +520,7 @@ def get_leaderboard():
     for idx, raw_golfer in enumerate(golfers, start=1):
         pos = parse_position_value(raw_golfer) or idx
         place_bonus = placement_bonus(pos) if apply_placement else 0.0
-        sc = score_one_golfer(raw_golfer, place_bonus, pos)
+        sc = score_one_golfer(raw_golfer, place_bonus, pos, round_3_started_for_field)
         scored_players.append(
             {
                 "athlete_id": sc.athlete_id,
@@ -477,8 +531,12 @@ def get_leaderboard():
                 "fantasy_points": sc.fantasy_points,
                 "made_cut": sc.made_cut,
                 "highlights": sc.scoring_highlights,
-                "base_breakdown": aggregate_breakdowns_for_rounds(sc.round_base_breakdown, [1, 2, 3, 4]),
-                "bonus_breakdown": aggregate_breakdowns_for_rounds(sc.round_bonus_breakdown, [1, 2, 3, 4]),
+                "base_breakdown": aggregate_breakdowns_for_rounds(
+                    sc.round_base_breakdown, [1, 2, 3, 4]
+                ),
+                "bonus_breakdown": aggregate_breakdowns_for_rounds(
+                    sc.round_bonus_breakdown, [1, 2, 3, 4]
+                ),
                 "placement_breakdown": sc.placement_breakdown,
                 "round_points": sc.round_points,
                 "rank": sc.rank,
@@ -492,6 +550,7 @@ def get_leaderboard():
 def fetch_live_scorecards() -> Dict[str, LivePlayerScorecard]:
     data = fetch_espn_leaderboard()
     golfers = map_espn_field(data)
+    round_3_started_for_field = field_has_started_round_3(golfers)
 
     apply_placement = all_positions_final(golfers)
 
@@ -499,7 +558,7 @@ def fetch_live_scorecards() -> Dict[str, LivePlayerScorecard]:
     for idx, raw_golfer in enumerate(golfers, start=1):
         pos = parse_position_value(raw_golfer) or idx
         place_bonus = placement_bonus(pos) if apply_placement else 0.0
-        sc = score_one_golfer(raw_golfer, place_bonus, pos)
+        sc = score_one_golfer(raw_golfer, place_bonus, pos, round_3_started_for_field)
         out[sc.athlete_id] = sc
     return out
 
@@ -520,7 +579,9 @@ def build_team_scoreboard(
             if sc and sc.made_cut is False:
                 missed_starters.append(slot)
 
-        active_backup_assignments = assign_active_backups(roster, scorecards, missed_starters)
+        active_backup_assignments = assign_active_backups(
+            roster, scorecards, missed_starters
+        )
 
         team_total = 0.0
         players_out: List[dict] = []
@@ -553,7 +614,9 @@ def build_team_scoreboard(
 
             sc = scorecards.get(player["athleteId"])
             is_backup = slot_name in BACKUP_SLOTS
-            coveredStarterSlot = active_backup_assignments.get(slot_name) if is_backup else None
+            coveredStarterSlot = (
+                active_backup_assignments.get(slot_name) if is_backup else None
+            )
             is_active_backup = bool(coveredStarterSlot)
 
             if not sc:
@@ -571,9 +634,17 @@ def build_team_scoreboard(
                         "madeCut": None,
                         "isBackup": is_backup,
                         "isActive": is_active_backup or not is_backup,
-                        "status": "active_backup" if is_active_backup else ("bench" if is_backup else "starter"),
+                        "status": (
+                            "active_backup"
+                            if is_active_backup
+                            else ("bench" if is_backup else "starter")
+                        ),
                         "coveredStarterSlot": coveredStarterSlot,
-                        "coveredStarterLabel": SLOT_LABELS.get(coveredStarterSlot) if coveredStarterSlot else None,
+                        "coveredStarterLabel": (
+                            SLOT_LABELS.get(coveredStarterSlot)
+                            if coveredStarterSlot
+                            else None
+                        ),
                         "scoringHighlights": [],
                         "baseBreakdown": {},
                         "bonusBreakdown": {},
@@ -587,12 +658,20 @@ def build_team_scoreboard(
                 placement_points = 0.0
                 status = "active_backup" if is_active_backup else "bench"
             else:
-                rounds_to_use = [1, 2, 3, 4] if sc.made_cut is True else ([1, 2] if sc.made_cut is False else [1, 2])
+                rounds_to_use = (
+                    [1, 2, 3, 4]
+                    if sc.made_cut is True
+                    else ([1, 2] if sc.made_cut is False else [1, 2])
+                )
                 placement_points = sc.placement_bonus if sc.made_cut is True else 0.0
                 status = "missed_cut" if sc.made_cut is False else "starter"
 
-            base_breakdown = aggregate_breakdowns_for_rounds(sc.round_base_breakdown, rounds_to_use)
-            bonus_breakdown = aggregate_breakdowns_for_rounds(sc.round_bonus_breakdown, rounds_to_use)
+            base_breakdown = aggregate_breakdowns_for_rounds(
+                sc.round_base_breakdown, rounds_to_use
+            )
+            bonus_breakdown = aggregate_breakdowns_for_rounds(
+                sc.round_bonus_breakdown, rounds_to_use
+            )
 
             base_points = round(sum(v["total"] for v in base_breakdown.values()), 2)
             bonus_points = round(sum(v["total"] for v in bonus_breakdown.values()), 2)
@@ -623,13 +702,19 @@ def build_team_scoreboard(
                     "basePoints": base_points,
                     "bonusPoints": bonus_points,
                     "placementBonus": round(placement_points, 2),
-                    "roundPoints": {r: sc.round_points.get(r, 0.0) for r in rounds_to_use},
+                    "roundPoints": {
+                        r: sc.round_points.get(r, 0.0) for r in rounds_to_use
+                    },
                     "madeCut": sc.made_cut,
                     "isBackup": is_backup,
                     "isActive": is_active_backup or not is_backup,
                     "status": status,
                     "coveredStarterSlot": coveredStarterSlot if is_backup else None,
-                    "coveredStarterLabel": SLOT_LABELS.get(coveredStarterSlot) if is_backup and coveredStarterSlot else None,
+                    "coveredStarterLabel": (
+                        SLOT_LABELS.get(coveredStarterSlot)
+                        if is_backup and coveredStarterSlot
+                        else None
+                    ),
                     "scoringHighlights": sc.scoring_highlights,
                     "baseBreakdown": base_breakdown,
                     "bonusBreakdown": bonus_breakdown,
@@ -640,9 +725,12 @@ def build_team_scoreboard(
         starter_made_cut_count = sum(
             1
             for player_row in players_out
-            if player_row.get("slot") in STARTER_SLOTS and player_row.get("madeCut") is True
+            if player_row.get("slot") in STARTER_SLOTS
+            and player_row.get("madeCut") is True
         )
-        starter_made_cut_total = round(starter_made_cut_count * STARTER_MADE_CUT_BONUS, 2)
+        starter_made_cut_total = round(
+            starter_made_cut_count * STARTER_MADE_CUT_BONUS, 2
+        )
         team_total = round(team_total + starter_made_cut_total, 2)
 
         teams_out[team] = {

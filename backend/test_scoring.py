@@ -1,7 +1,29 @@
 from scoring import score_golfer, SCORING_RULES
-from scraper import fetch_espn_leaderboard, map_espn_field
+from scraper import fetch_espn_leaderboard, map_espn_field, map_espn_golfer
 from leaderboard import get_leaderboard, fetch_live_scorecards
 
+data = fetch_espn_leaderboard()
+competitors = data["events"][0]["competitions"][0]["competitors"]
+
+for raw in competitors:
+    golfer = map_espn_golfer(raw)
+    if golfer["name"] in ["Nicolai Højgaard", "Jason Day"]:
+        rounds = golfer.get("rounds", [])
+        played_rounds = sum(
+            1 for rnd in rounds
+            if any(h.get("strokes") is not None for h in rnd)
+        )
+
+        round3_started = (
+            len(rounds) >= 3 and
+            any(h.get("strokes") is not None for h in rounds[2])
+        )
+
+        print("\n=== DEBUG ===")
+        print("Name:", golfer["name"])
+        print("Played rounds:", played_rounds)
+        print("Round 3 started:", round3_started)
+        print("Rounds:", rounds)
 
 '''
 data = fetch_espn_leaderboard()
@@ -61,7 +83,8 @@ golfer_data = {
     ],
     "finishing_position": 12
 }
-'''
+
+
 normalized_golfer = {
     "name": "Mikel Arteta",
     "rounds": [
@@ -72,6 +95,7 @@ normalized_golfer = {
     ],
     "finishing_position": None,
 }
+'''
 
 '''
 result_golf = score_golfer(golfer_data, SCORING_RULES)
@@ -87,5 +111,5 @@ print(result_norm)
 
 #print(get_leaderboard()[:5])
 
-cards = fetch_live_scorecards()
-print(list(cards.items())[:2])
+#cards = fetch_live_scorecards()
+#print(list(cards.items())[:2])
