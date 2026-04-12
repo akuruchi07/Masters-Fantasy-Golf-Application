@@ -1,4 +1,5 @@
 # Masters Draft Room
+**Created by Ashwin Kuruchi and Abhilash Chauhan**
 
 A live fantasy draft and scoring app for the Masters Tournament.
 
